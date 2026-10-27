@@ -1,0 +1,89 @@
+RELATÓRIO — CORREÇÃO MÍNIMA DE CONFIGURAÇÃO SUPABASE E CONGELAMENTO
+DA CAMADA PROTEGIDA — MONIT.CAMPO
+Data: 2026-09-18 (UTC)
+
+ESCOPO EXECUTADO
+Corrigir a divergência de configuração do arquivo ".env" para o Supabase
+oficial e congelar/documentar a camada protegida. Nenhuma funcionalidade
+operacional, arquitetura ou implementação de acesso foi alterada.
+
+1. ARQUIVO ALTERADO
+   - .env (raiz do projeto)
+
+2. ALTERAÇÃO REALIZADA
+   O .env apontava para o projeto Supabase antigo
+   (ecdhvrfzmoxkkzwueegx.supabase.co). Foi corrigido para apontar
+   exclusivamente para o Supabase oficial:
+     SUPABASE_URL=https://bhymidkpthyuojqcflzp.supabase.co
+     SUPABASE_PUBLISHABLE_KEY=sb_publishable_1sMpnPytGHHN5OLoxM2j3w_9qqnSeG1
+     SUPABASE_PROJECT_ID=bhymidkpthyuojqcflzp
+     (e as mesmas três com prefixo VITE_)
+   Somente a chave PUBLICÁVEL foi usada. Nenhuma service_role, sb_secret,
+   senha do banco ou connection string foi adicionada.
+
+3. MOTIVO
+   Auditoria identificou divergência: .env apontava para projeto diferente
+   do Supabase oficial já configurado em .env.development, .env.production
+   e env.official.mjs.
+
+4. SUPABASE UTILIZADO
+   - Projeto oficial: https://bhymidkpthyuojqcflzp.supabase.co
+   - Tabela: public.installations (inalterada)
+   - RPC: public.monit_installation_access(p_installation_id, p_name)
+     (inalterada)
+
+5. VERIFICAÇÃO DOS AMBIENTES (todos apontam para o Supabase oficial)
+   - .env              → OK (corrigido nesta tarefa)
+   - .env.development  → OK (já estava correto)
+   - .env.production   → OK (já estava correto)
+   - env.official.mjs  → OK (lê .env.production; inalterado)
+   - Busca por referências ao projeto antigo (ecdhvrfzmoxkkzwueegx) em
+     código e arquivos .env*: nenhuma ocorrência restante.
+
+6. ARQUIVOS DA CAMADA PROTEGIDA (congelados — não alterar sem solicitação
+   explícita de controle de acesso)
+   - src/lib/access/index.ts      (interface única: getInstallationAccess)
+   - src/lib/access/remote.ts     (única chamada à RPC)
+   - src/lib/access/local.ts      (Installation ID, cofre do último estado,
+                                   credenciais locais)
+   - src/lib/access/protocol.ts   (contrato de estados)
+   - src/lib/access/hash.ts       (PBKDF2 do login local)
+   - src/hooks/useAuth.ts         (orquestração + timer único de 10 min)
+   - src/components/InstallationGate.tsx (tela de bloqueio/verificação)
+   - src/integrations/supabase/client.ts (cliente gerado, chave publicável)
+   - src/lib/access/__tests__/    (testes de regressão da camada)
+   - .env, .env.development, .env.production, .env.example, env.official.mjs
+   Documentação: PROTECAO_CAMADA_ACESSO_MONIT_CAMPO.md (atualizado nesta
+   tarefa: .env incluído na configuração da camada; registrados Supabase
+   oficial, RPC, Installation ID, regra autorizada/pendente/bloqueada,
+   comportamento offline e intervalo de reconsulta de 10 minutos).
+
+7. COMPORTAMENTO PRESERVADO (nada alterado)
+   - autorizada → permite; pendente/bloqueada → impedem.
+   - Installation ID único e persistente (inalterado).
+   - Offline = SEM COMUNICAÇÃO (último estado válido), nunca bloqueio.
+   - Reconsulta única a cada 10 minutos; sem heartbeat, telemetria,
+     WebSocket ou Realtime.
+   - Login local (ADMIN, PBKDF2) inalterado.
+   - Nenhuma funcionalidade operacional modificada.
+
+8. TESTES EXECUTADOS
+   - npm run build → PASSOU.
+   - Verificação de divergência de configuração (grep em código e .env*)
+     → PASSOU (nenhuma referência ao projeto antigo).
+   - npm run lint → NÃO executado nesta tarefa: o projeto possui ~2.864
+     apontamentos de formatação Prettier preexistentes em módulos não
+     relacionados; corrigir isso está fora do escopo desta correção mínima.
+   - Testes da camada (npm run test:access, 12 testes) já passavam e
+     nenhum arquivo testado foi alterado nesta tarefa.
+
+9. PENDÊNCIAS
+   - Autorizar instalações (pendente → autorizada) continua sendo ação
+     manual do administrador no banco.
+   - Gerar o instalador Windows (npm run dist) exige máquina Windows;
+     não executado neste ambiente.
+   - Apontamentos de formatação do lint (preexistentes) permanecem.
+
+CONCLUSÃO
+Configuração corrigida: todos os ambientes apontam exclusivamente para o
+Supabase oficial. Camada protegida documentada e congelada. Build OK.

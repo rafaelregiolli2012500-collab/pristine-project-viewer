@@ -1,0 +1,73 @@
+RELATÓRIO — CENTRAL ADMIN MONIT.CAMPO
+=====================================
+
+ARQUITETURA
+  MONIT.CAMPO.EXE -> API (server-side, hospedagem Lovable) -> Supabase public.installations
+  Navegador -> /admin -> API -> Supabase
+  Decisão: hospedagem no Lovable (escolhida pelo usuário) em vez de Netlify. Não há netlify.toml.
+  O frontend nunca acessa o Supabase; só chama /api/*.
+
+ARQUIVOS PRINCIPAIS
+  src/lib/monit/supabase.ts    único módulo de acesso ao Supabase (PostgREST via fetch)
+  src/lib/monit/api.ts         roteador de todos os endpoints /api/*
+  src/lib/monit/session.ts     sessão assinada HMAC-SHA256 em cookie
+  src/lib/monit/validation.ts  validações (UUID, nome, status, campos permitidos)
+  src/lib/monit/rateLimit.ts   rate limit em memória
+  src/lib/monit/client.ts      cliente do navegador (somente /api)
+  src/routes/api/$.ts          ponto de entrada HTTP da API
+  src/routes/admin.tsx         painel
+  supabase/schema.sql          fonte única do schema (idêntico à migration)
+  supabase/migrations/         migration aplicada automaticamente
+  tests/api.test.ts            26 testes de lógica/segurança
+  tests/integration.test.ts    teste real contra o Supabase (sem mock)
+
+ENDPOINTS
+  GET  /api/health                         {"status":"ok"}
+  POST /api/public/monit/installations     {installation_id, name} -> {installation_id, name, status}
+  POST /api/admin/login                    {password} -> 200 | 401
+  POST /api/admin/logout
+  GET  /api/admin/session                  {"authenticated": bool}
+  GET  /api/admin/installations            (sessão) lista
+  POST /api/admin/installations/status     (sessão) {installation_id, status: autorizada|bloqueada}
+  POST /api/admin/installations/name       (sessão) {installation_id, name}
+  DELETE /api/admin/installations/:id      (sessão) exclui uma instalação (404 se não existir)
+  DELETE /api/admin/installations          (sessão) limpa todas; com ?status=pendente|autorizada|bloqueada limpa só aquele status
+  Códigos: 400 401 403 404 405 408 429 500 502 503. Mensagens nunca expõem segredos/stack.
+
+BANCO
+  public.installations (id, installation_id UNIQUE, name, status CHECK, created_at, updated_at)
+  Índices em status e installation_id; trigger atualiza updated_at.
+  Registro é um upsert atômico (on_conflict=installation_id) que só altera name/updated_at;
+  status e created_at são preservados. Nova instalação nasce 'pendente' (default do banco).
+
+SEGURANÇA
+  RLS ativo, sem políticas; privilégios revogados de anon e authenticated; apenas service_role.
+  Chave service role só em variável de ambiente do servidor; o build do navegador foi verificado sem ela.
+  sb_secret_*: enviada só como header apikey (sem Bearer). Chaves JWT antigas: apikey + Bearer.
+  sb_publishable_*: rejeitada -> 503 "Serviço administrativo indisponível."
+  Endpoint público rejeita qualquer campo além de installation_id e name (status -> 400).
+  POST administrativos com Origin de outro domínio -> 403.
+  Exclusão só pelo painel autenticado; é definitiva e sem lista negra: o mesmo ID pode registrar
+  de novo e volta como 'pendente'.
+
+AUTENTICAÇÃO / SESSÃO
+  Senha em MONIT_ADMIN_PASSWORD, comparação em tempo constante.
+  Cookie monit_admin_session: HttpOnly; Secure; SameSite=Lax; validade ADMIN_SESSION_TTL_SECONDS (padrão 12h).
+  Sessão sem estado (assinada): logout apaga o cookie; um token copiado continua válido até expirar.
+  Para invalidar todas as sessões, troque ADMIN_SESSION_SECRET.
+
+RATE LIMIT
+  Login 10/min/IP, público 30/min/IP, em memória por instância. Proteção básica: em ambiente
+  serverless cada instância tem sua própria contagem, não é um limite global.
+
+TESTES / BUILD
+  npm test: 26 passaram; integração pulada até o Supabase estar conectado.
+  npm run lint: 0 erros. npm run build: OK.
+
+CONFIGURAÇÃO NECESSÁRIA
+  MONIT_SUPABASE_URL, MONIT_SUPABASE_SERVICE_ROLE_KEY (ou o conector Supabase do projeto,
+  que fornece SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY), MONIT_ADMIN_PASSWORD, ADMIN_SESSION_SECRET.
+
+LIMITAÇÕES
+  Integração real e teste de produção dependem de conectar o Supabase e publicar.
+  O .exe não foi alterado; ele lê o status na resposta do POST de registro.

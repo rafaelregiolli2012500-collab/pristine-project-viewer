@@ -1,0 +1,315 @@
+================================================================================
+RELATORIO DE AUDITORIA FINAL — MONIT.CAMPO / MONIT.EXE
+Autor e criador do sistema: Rafael Regiolli de Souza
+Data da auditoria: 2026-09-20 (UTC) / 2026-09-19 (America/Sao_Paulo)
+Escopo: auditoria, validacao e preparacao para geracao do instalador Windows.
+Nenhuma reconstrucao, refatoracao ou melhoria estetica foi executada.
+================================================================================
+
+1. ESTADO INICIAL
+--------------------------------------------------------------------------------
+Projeto recebido exatamente como estava, com a camada protegida de controle de
+acesso ja migrada, configurada e congelada em etapas anteriores.
+Documentos existentes na raiz:
+  - PROTECAO_CAMADA_ACESSO_MONIT_CAMPO.md
+  - CAMADA_ACESSO_MANIFESTO.md
+  - RELATORIO_CAMADA_PROTEGIDA_ACESSO_MONIT_CAMPO.txt
+  - RELATORIO_CONFIGURACAO_SUPABASE_MONIT_CAMPO.txt
+  - RELATORIO_CORRECAO_CAMADA_PROTEGIDA_MONIT_CAMPO.txt
+Build do ambiente no inicio da auditoria: OK (registro "build OK").
+
+2. ARQUITETURA ENCONTRADA
+--------------------------------------------------------------------------------
+MONIT.CAMPO.EXE (Electron) → React → Supabase JS → HTTPS → Supabase oficial
+→ RPC public.monit_installation_access → public.installations.
+
+Nao existe API intermediaria, servidor proprio, webhook, heartbeat de acesso,
+telemetria, WebSocket ou Supabase Realtime.
+
+Separacao confirmada:
+  CAMADA PROTEGIDA  : Installation ID, consulta de autorizacao, RPC, offline,
+                      persistencia do ultimo estado valido, reconsulta periodica,
+                      decisao de entrada.
+  CAMADA OPERACIONAL: Dashboard, Manutencoes, Base e Terceiros, Colhedoras,
+                      Tratores, Caminhoes, Moagem, Cronograma, Linha do Tempo,
+                      Trajetos, Visao para Print, Historico, Cadastro, Config,
+                      backup/restauracao e exportacoes.
+
+3. CAMADA PROTEGIDA
+--------------------------------------------------------------------------------
+Arquivos reais verificados (todos presentes, nenhum alterado nesta auditoria):
+  src/lib/access/index.ts       — INTERFACE UNICA: getInstallationAccess(),
+                                  decidirAcesso(), mensagemAcesso(),
+                                  INTERVALO_RECONSULTA_MS = 600000 ms.
+  src/lib/access/remote.ts      — unica chamada a RPC monit_installation_access.
+  src/lib/access/local.ts       — Installation ID + cofre local (pasta CHAVE).
+  src/lib/access/protocol.ts    — contrato de estados e credencial semente ADMIN.
+  src/lib/access/hash.ts        — PBKDF2-SHA256 (100000 iteracoes).
+  src/hooks/useAuth.ts          — unico consumidor: 1 consulta inicial + 1 timer.
+  src/components/InstallationGate.tsx — portao de entrada antes do login local.
+  src/integrations/supabase/client.ts — cliente gerado (nao editado).
+  src/lib/access/__tests__/     — testes automatizados da camada.
+  .env / .env.development / .env.production / .env.example / env.official.mjs
+
+Verificacoes estruturais:
+  - Uma unica implementacao de consulta de autorizacao
+    (rg "monit_installation_access" → somente remote.ts, tipos gerados e docs).
+  - Nenhum componente operacional consulta a tabela installations
+    (rg ".from('installations'" → nenhuma ocorrencia).
+  - Um unico timer de reconsulta (rg "INTERVALO_RECONSULTA_MS" → useAuth.ts).
+  - Nenhum segundo Installation ID.
+
+4. SUPABASE
+--------------------------------------------------------------------------------
+Projeto oficial: bhymidkpthyuojqcflzp
+URL oficial     : https://bhymidkpthyuojqcflzp.supabase.co
+Tabela          : public.installations
+RPC             : public.monit_installation_access(p_installation_id, p_name)
+Variaveis       : VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
+                  (VITE_SUPABASE_PROJECT_ID informativo)
+
+Estado dos arquivos de ambiente:
+  .env.development  → projeto oficial  (OK)
+  .env.production   → projeto oficial  (OK)
+  .env.example      → apenas nomes, sem valores  (OK)
+  env.official.mjs  → aplica os valores oficiais de .env.production ao ambiente
+                      de build ANTES do Vite montar import.meta.env  (OK)
+  .env              → arquivo gerado/gerenciado pela plataforma; voltou a conter
+                      o projeto antigo (ecdhvrfzmoxkkzwueegx). Ver item 15/16.
+
+Prova objetiva de qual projeto o aplicativo usa (bundles recompilados nesta
+auditoria):
+  dist/client/assets/index-*.js        → 4x "bhymidkpthyuojqcflzp", 0x antigo
+  dist/server/_ssr/client-*.mjs        → 4x "bhymidkpthyuojqcflzp", 0x antigo
+  dist-electron/assets/Index-*.js      → 4x "bhymidkpthyuojqcflzp", 0x antigo
+Nenhuma referencia ao projeto antigo existe no codigo-fonte da aplicacao nem nos
+artefatos gerados. As ocorrencias remanescentes estao apenas em textos de
+relatorios historicos, em supabase/config.toml (arquivo de plataforma, nao lido
+pelo .exe) e no .env gerado (neutralizado por env.official.mjs).
+
+5. INSTALLATION ID
+--------------------------------------------------------------------------------
+Mecanismo preservado integralmente (src/lib/access/local.ts):
+  chave: localStorage "monit.campo/CHAVE/installation_id"
+  formato: UUID gerado uma unica vez por computador.
+Teste em navegador: o mesmo ID (c6930ee2-0dea-4555-b230-a20af2b48c1e) permaneceu
+identico apos 6 reabres consecutivos da aplicacao e apos mudancas de status.
+Nenhum segundo identificador foi criado.
+
+6. CONTROLE DE ACESSO
+--------------------------------------------------------------------------------
+Regra confirmada em execucao real:
+  autorizada → PERMITE ENTRADA (exibe o login local)
+  pendente   → IMPEDE ENTRADA ("instalacao ainda nao autorizada")
+  bloqueada  → IMPEDE ENTRADA ("instalacao esta bloqueada")
+Instalacao nova: a RPC cria o registro como "pendente" e o aplicativo NAO entra.
+O aplicativo nao possui qualquer caminho para alterar o proprio status.
+Nao existe autorizacao automatica; a liberacao e sempre manual do administrador.
+
+7. LOGIN
+--------------------------------------------------------------------------------
+Login local preservado: credencial semente ADMIN, PBKDF2-SHA256 com salt
+individual, cofre AES-GCM. Nenhuma senha em texto puro no codigo.
+Teste: apos autorizacao remota, o login local abriu o CENTRO DE OPERACOES
+AGRICOLAS normalmente. Nenhuma alteracao feita no fluxo de login.
+
+8. OFFLINE
+--------------------------------------------------------------------------------
+Falhas de comunicacao (sem internet, DNS, conexao recusada, timeout, 4xx/5xx,
+resposta invalida) sao tratadas como SEM COMUNICACAO e nunca como "bloqueada".
+Nesse caso o aplicativo usa o ultimo estado valido do cofre local; se nunca
+houve autorizacao valida, permanece negado.
+Teste com a rede interrompida apos autorizacao: o acesso permaneceu liberado,
+sem tela branca e sem erro de pagina. Ao restabelecer a comunicacao, a consulta
+seguinte voltou a refletir o status remoto.
+Reconsulta: 1 consulta na abertura + 1 timer unico de 10 minutos (600000 ms).
+
+9. SEGURANCA
+--------------------------------------------------------------------------------
+Somente a chave PUBLICAVEL existe no cliente. Nenhuma service_role, sb_secret,
+senha de banco, connection string ou token administrativo no frontend, no
+renderer, no preload, no bundle ou no .env distribuido.
+Busca nos artefatos gerados por chave secreta/sevice role: nenhuma ocorrencia.
+(As unicas mencoes a "sb_secret" no repositorio sao textos de documentacao e uma
+validacao de formato da biblioteca gerada — nao ha valor de chave.)
+
+10. ELECTRON
+--------------------------------------------------------------------------------
+electron/main.cjs: contextIsolation: true, nodeIntegration: false,
+sandbox: true, webSecurity: true — preservados.
+Carregamento via protocolo interno app://monit.campo/ (sem servidor externo).
+electron/preload.cjs expoe apenas controles nominais de janela (minimizar,
+maximizar, fechar, estado da janela). Nenhuma API de Node e nenhum segredo
+expostos ao renderer.
+Scripts Electron existentes: build:electron, electron, dist.
+
+11. TESTES
+--------------------------------------------------------------------------------
+Comando:    npm run test:access
+Resultado:  2 arquivos / 12 testes — TODOS PASSARAM
+Observacao: cobrem contrato de estados, regra de decisao, mensagens,
+            periodicidade de 600000 ms, offline com e sem estado valido,
+            persistencia e prefixo das chaves do Installation ID.
+
+Comando:    RPC com a chave publica — instalacao propria
+Resultado:  HTTP 200, retorno [{"name":"Auditoria","status":"pendente"}]
+Observacao: a RPC retorna somente name e status; instalacao nova nasce pendente.
+
+Comando:    RPC tentando forcar o proprio status (p_status: "autorizada")
+Resultado:  HTTP 404 (PGRST202 — assinatura inexistente)
+Observacao: o cliente nao possui forma de escolher o proprio status.
+
+Comando:    SELECT direto em public.installations (chave publica)
+Resultado:  HTTP 401 — permission denied (42501)
+Comando:    INSERT direto   → HTTP 401
+Comando:    UPDATE direto   → HTTP 401
+Comando:    DELETE direto   → HTTP 401
+Observacao: acesso direto a tabela continua bloqueado; somente a RPC responde.
+
+Comando:    RPC com dados invalidos (sem installation_id)
+Resultado:  HTTP 404 (assinatura nao encontrada); a aplicacao trata como
+            SEM COMUNICACAO e nao quebra nem bloqueia.
+
+Comando:    Ciclo completo em navegador (Playwright), 6 reinicializacoes
+Resultado:  pendente → negado; autorizada → login liberado; bloqueada → negado;
+            bloqueada→autorizada → liberado; offline com ultimo estado
+            autorizada → continuou liberado; pendente novamente → negado.
+Observacao: Installation ID identico nas 6 execucoes; zero erros de pagina.
+
+Comando:    Verificacao de tipos (tsgo --noEmit) via build do projeto
+Resultado:  build de producao e build Electron concluidos sem erro.
+Observacao: a execucao isolada do typecheck completo excede o limite de tempo do
+            ambiente; a compilacao real (que faz a checagem efetiva) passou.
+
+12. BUILD
+--------------------------------------------------------------------------------
+Comando:    npm run build
+Resultado:  SUCESSO (exit 0)
+Comando:    npm run build:electron
+Resultado:  SUCESSO (exit 0) — dist-electron gerado, apontando exclusivamente
+            para o Supabase oficial.
+Comando:    npm run dist
+Resultado:  NAO EXECUTADO — exige Windows (electron-builder --win nsis).
+Observacao: ambiente de auditoria e Linux.
+
+BUILD WEB/PROJETO: VALIDADO
+INSTALADOR WINDOWS: PENDENTE DE EXECUCAO EM WINDOWS
+
+13. LINT
+--------------------------------------------------------------------------------
+Comando:    npm run lint (eslint .)
+Resultado:  nao concluiu dentro do limite de tempo do ambiente (projeto grande).
+Comando:    npx eslint src/lib/access src/hooks/useAuth.ts
+            src/components/InstallationGate.tsx
+Resultado:  104 apontamentos, 100% da regra prettier/prettier (aspas simples x
+            aspas duplas, quebras de linha).
+Comando:    npx prettier --list-different .
+Resultado:  70 arquivos com divergencia de formatacao.
+Natureza:   exclusivamente estetica (formatacao), preexistente e nao relacionada
+            a esta etapa.
+Impacto no build: NENHUM — build de producao e build Electron passam.
+Decisao:    nao executar reformatacao em massa do projeto, conforme instrucao.
+
+14. TESTES OPERACIONAIS
+--------------------------------------------------------------------------------
+Apos autorizacao e login local, cada modulo foi aberto em execucao real:
+  Manutencoes        OK
+  Base e Terceiros   OK
+  Dashboard Frentes  OK
+  Dash Caminhoes     OK
+  Moagem             OK
+  Cronograma         OK
+  Linha do Tempo     OK
+  Trajetos           OK
+  Visao para Print   OK
+  Historico          OK
+  Cadastro           OK
+  Config             OK
+Zero erros de pagina (pageerror) em toda a navegacao.
+Cabecalho operacional (data, hora, turno, safra, contadores de paradas,
+colhedoras/tratores/caminhoes parados) exibido normalmente.
+
+Backup e restauracao (src/lib/backup.ts) — verificado por leitura de codigo:
+  - todas as chaves com prefixo "monit.campo/CHAVE" (Installation ID, cofre de
+    autorizacao e sessao) sao tratadas como protegidas: nunca exportadas e nunca
+    substituidas na restauracao;
+  - a chave legada "monit_installation_id" tambem consta como volatil;
+  - portanto restaurar backup nao altera o Installation ID, nao autoriza, nao
+    bloqueia e nao sobrescreve o status remoto.
+
+Ausencia de telemetria: nenhuma rotina de heartbeat, evento tecnico,
+localizacao, rastreamento, WebSocket ou Realtime relacionada ao controle de
+acesso. O unico "heartbeat" do projeto e o bloqueio de edicao local existente
+(src/hooks/useEditLock.ts), que opera apenas no armazenamento local do proprio
+computador e nao envia dado algum para fora.
+
+15. ALTERACOES REALIZADAS
+--------------------------------------------------------------------------------
+Arquivo   : RELATORIO_AUDITORIA_FINAL_MONIT_CAMPO.txt
+Alteracao : criado
+Motivo    : entregar o relatorio exigido por esta etapa.
+
+Nenhum outro arquivo foi criado, alterado ou removido.
+Nenhum arquivo da camada protegida foi modificado — nenhuma falha objetiva que
+impedisse o funcionamento especificado foi encontrada.
+Nenhuma funcionalidade operacional foi modificada.
+
+16. PENDENCIAS
+--------------------------------------------------------------------------------
+P1. INSTALADOR WINDOWS — depende de Windows.
+    Executar em maquina Windows: npm run dist
+    (equivale a npm run build:electron + electron-builder --win nsis;
+     saida em release/MONIT.CAMPO-Setup-1.0.0.exe).
+
+P2. AUTORIZACAO DE INSTALACAO — acao manual do administrador.
+    Toda instalacao nova nasce "pendente" e so entra depois que o administrador
+    alterar o status para "autorizada" diretamente no Supabase oficial.
+
+P3. ARQUIVO .env — gerenciado pela plataforma.
+    O .env da raiz e regenerado automaticamente pelo ambiente e voltou a conter
+    o projeto antigo. Isso NAO afeta o aplicativo: env.official.mjs impoe os
+    valores oficiais de .env.production antes do Vite, e a verificacao dos
+    bundles gerados nesta auditoria confirma que web e Electron apontam somente
+    para bhymidkpthyuojqcflzp. Recomendacao: nao editar o .env manualmente;
+    a origem unica da verdade e .env.production + env.official.mjs.
+
+P4. LINT/PRETTIER — 70 arquivos com divergencia de formatacao preexistente.
+    Nao impede build nem execucao. Correcao opcional, fora do escopo desta etapa.
+
+17. CRITERIOS DE ACEITACAO
+--------------------------------------------------------------------------------
+[x] Supabase oficial confirmado.
+[x] Nenhuma referencia ao projeto antigo em uso pelo aplicativo (ver P3).
+[x] Installation ID preservado.
+[x] Login preservado.
+[x] PBKDF2 preservado.
+[x] autorizada permite entrada.
+[x] pendente impede entrada.
+[x] bloqueada impede entrada.
+[x] Offline nao bloqueia por erro de comunicacao.
+[x] Reconsulta de 10 minutos preservada.
+[x] Nenhum heartbeat de acesso criado.
+[x] Nenhuma telemetria criada.
+[x] Nenhum WebSocket/Realtime criado.
+[x] Chave privada nao esta no cliente.
+[x] Acesso direto a tabela continua protegido.
+[x] RPC existente preservada.
+[x] Electron continua protegido.
+[x] Funcionalidades operacionais preservadas.
+[x] Testes da camada passam (12/12).
+[x] Build passa.
+[x] Situacao do instalador Windows registrada corretamente.
+
+18. CLASSIFICACAO FINAL
+--------------------------------------------------------------------------------
+MONIT.CAMPO — PRONTO PARA GERACAO DO INSTALADOR WINDOWS
+
+Observacao: a geracao do .exe em si continua pendente de execucao em maquina
+Windows (P1), e a autorizacao de cada instalacao permanece ato manual do
+administrador (P2). Nenhuma falha tecnica real foi encontrada no projeto.
+
+19. CONGELAMENTO
+--------------------------------------------------------------------------------
+A camada protegida permanece congelada. Proxima etapa exclusiva:
+GERACAO E TESTE DO INSTALADOR WINDOWS.
+================================================================================

@@ -1,0 +1,103 @@
+MONIT.CAMPO — CHECK-UP: ERRO 500 EM POST /api/public/monit/installations
+Autor e criador: Rafael Regiolli de Souza
+Data: 2026-09-10
+
+1. CAUSA REAL DO HTTP 500
+   O registro da instalação não era idempotente. A rota fazia SELECT e, se
+   não encontrasse, fazia INSERT. Na abertura do aplicativo o registro é
+   disparado duas vezes praticamente ao mesmo tempo (ver logs de rede: dois
+   POST idênticos no mesmo segundo). As duas chamadas liam "não existe" e
+   as duas tentavam inserir o mesmo installation_id. A segunda batia na
+   chave primária (violação de unicidade) e a rota devolvia
+   { ok: false, erro: 'registro' } com HTTP 500 — condição de corrida.
+
+2. ARQUIVO RESPONSÁVEL
+   src/routes/api/public/monit/installations.ts
+
+3. CORREÇÃO REALIZADA
+   - INSERT trocado por UPSERT com onConflict = installation_id e
+     ignoreDuplicates, tornando o registro idempotente.
+   - Em caso de erro, a rota reconsulta a instalação; se ela já existir,
+     responde ok com o status atual (sem duplicar e sem erro fatal).
+   - Falha real de banco passa a responder 202 com
+     { ok: false, erro: 'registro indisponível' } — indisponibilidade
+     controlada, sem 5xx e sem tela branca.
+   - Nada mais foi alterado: validação de payload, rate limit, limite de
+     corpo e demais rotas seguem iguais.
+
+4. COMPORTAMENTO COM API ONLINE
+   Login com ADMIN → registro/sincronização da instalação → sistema normal.
+   10 chamadas simultâneas com o mesmo installation_id: 10x HTTP 200,
+   nenhuma duplicidade criada.
+
+5. COMPORTAMENTO COM API OFFLINE
+   Teste com todas as chamadas /api/public/monit/** abortadas: login com
+   ADMIN funciona, sistema abre normalmente, sem tela branca.
+   A camada src/lib/access/api.ts já trata timeout (8 s, AbortController),
+   NetworkError, falha de fetch e qualquer HTTP 4xx/5xx como "sem
+   comunicação", nunca lançando erro para a interface.
+
+6. COMPORTAMENTO COM HTTP 500 FORÇADO
+   Teste interceptando a rota e devolvendo 500: login com ADMIN funciona,
+   sistema abre normalmente, ALT+F12 abre a CENTRAL DEV, sem tela branca.
+
+7. TESTE DO ADMIN
+   Senha inicial ADMIN ativa (hash+salt PBKDF2-SHA256, sem texto puro).
+   Login OK online, offline e com API em erro. Aparece em CENTRAL DEV →
+   ACESSOS como ATIVO, com bloqueio/exclusão apenas manuais.
+
+8. IDENTIFICADOR LOCAL
+   installation_id permanece persistente na pasta CHAVE (localStorage do
+   aplicativo). Não é gerado novo ID a cada abertura.
+
+9. ELECTRON
+   Build Electron executado com sucesso; app://monit.campo/ inalterado,
+   preload seguro inalterado. A ausência da API não impede o carregamento —
+   validado pelos cenários offline e 500 acima (mesmo código de interface).
+   Observação: a execução gráfica do .exe empacotado não é possível neste
+   ambiente Linux sem Wine; o teste equivalente foi feito no build web.
+
+10. RESULTADO DOS BUILDS
+    npm install ............ código 0
+    npm run build .......... código 0
+    npm run electron:build . código 0
+    typecheck (tsgo) ....... código 0
+
+11. FUNCIONALIDADES NÃO ALTERADAS
+    Linha do Tempo, Base e terceiros, Colhedoras, Tratores, Caminhões,
+    Cadastro, Manutenções, Histórico, Cronograma, Dashboard, Alocação,
+    Moagem, filtros, contadores, cálculos, backup, restauração, exportação,
+    importação, armazenamento local, Electron, instalador e Central DEV.
+
+===========================================================
+AJUSTE — PRIMEIRO ACESSO COM ADMIN NO PREVIEW (2026-09-10)
+===========================================================
+
+CAUSA ENCONTRADA
+  Havendo origem HTTP (Preview/navegador), useAuth.ts consultava a API e,
+  ao receber HTTP 401 do /auth/check, encerrava com "Senha incorreta" sem
+  jamais consultar a credencial inicial local (SEED_ADMIN). Em um
+  computador/navegador novo, ou com banco sem a credencial, o primeiro
+  acesso ficava impossível.
+
+ALTERAÇÃO REALIZADA (somente src/hooks/useAuth.ts)
+  - Em caso de 401 e existindo cofre local: continua "Senha incorreta".
+  - Em caso de 401 e SEM cofre local (máquina nova): consulta a situação da
+    instalação; se estiver "bloqueada", o acesso é negado; caso contrário,
+    valida por verifyLocalPassword() (SEED_ADMIN com salt + PBKDF2-SHA256).
+  - Mesma regra aplicada à senha administrativa da Central DEV.
+  - Nenhuma senha em texto puro foi adicionada. API, upsert de instalações,
+    Central DEV, Electron e demais módulos não foram alterados.
+
+TESTES EXECUTADOS (Playwright, contexto limpo = sem localStorage)
+  A. Preview limpo, API online .......... ADMIN → LOGIN OK
+  B. API respondendo HTTP 401 ........... ADMIN → LOGIN OK (SEED local)
+  C. API indisponível (offline) ......... ADMIN → LOGIN OK
+  D. Instalação bloqueada remotamente ... ACESSO BLOQUEADO (sem bypass)
+  E. ALT + F12 após o login ............. CENTRAL DEV abre
+  Electron: não executável graficamente neste ambiente Linux; o mesmo
+  código de login/Central foi validado no build web.
+
+BUILD
+  bunx tsgo --noEmit .... código 0
+  npm run build ......... código 0

@@ -1,0 +1,131 @@
+MONIT.CAMPO — CORREÇÃO DA COMUNICAÇÃO DA CENTRAL DEV
+Data: 2026-09-11 (UTC)
+
+1. CAUSA ENCONTRADA
+-------------------
+A verificação de senha (PBKDF2-SHA256, src/lib/access/hash.ts) usava
+120.000 iterações. O servidor de borda onde a aplicação publicada roda
+(workerd / Web Crypto) aceita no máximo 100.000 iterações; acima disso a
+derivação falha. Como verifyPassword() captura a exceção e devolve
+"false", TODA verificação administrativa no servidor publicado voltava
+como credencial inválida (HTTP 401), enquanto no ambiente local (Node)
+funcionava normalmente.
+
+Confirmação prática:
+- local  POST /api/public/monit/admin/installations -> HTTP 200
+- publicado (mesmo corpo, mesma senha)               -> HTTP 401
+
+Efeito na interface: a Central DEV não recebia dados e exibia apenas a
+mensagem genérica "Sem comunicação com o servidor", sem diagnóstico.
+
+Causa secundária (diagnóstico): src/lib/access/api.ts devolvia apenas
+"offline/online" e a Central DEV não diferenciava os motivos reais.
+
+2. ARQUIVOS ANALISADOS
+----------------------
+src/lib/access/api.ts, local.ts, hash.ts, protocol.ts, db.server.ts,
+guard.server.ts, location.ts
+src/components/DevCentral.tsx (a antiga DeveloperCentral.tsx não existe mais)
+src/hooks/useAuth.ts
+src/routes/api/public/monit/installations.ts
+src/routes/api/public/monit/auth/check.ts
+src/routes/api/public/monit/location.ts
+src/routes/api/public/monit/admin/installations.ts
+src/routes/api/public/monit/admin/credentials.ts
+src/routes/api/public/monit/admin/locations.ts
+src/routes/health.ts
+electron/main.cjs, electron/preload.cjs, package.json, .env.example
+Banco: tabela access_credentials (somente a credencial ADMIN existia)
+
+3. ARQUIVOS ALTERADOS
+---------------------
+src/lib/access/hash.ts
+  Alteração: PBKDF2_ITERATIONS 120000 -> 100000 (com comentário).
+  Motivo: teto do Web Crypto do servidor de borda; acima disso toda
+  verificação de senha falha no servidor publicado.
+
+src/lib/access/protocol.ts
+  Alteração: password_hash do SEED_ADMIN recalculado para 100.000
+  iterações (mesmo salt, mesma senha, nenhuma senha em texto puro).
+  Motivo: manter o ADMIN funcionando local e remotamente.
+
+Banco (access_credentials)
+  Alteração: password_hash da credencial ADMIN atualizado para o mesmo
+  valor recalculado. Nenhuma senha foi trocada, nenhum acesso criado.
+
+src/lib/access/api.ts
+  Alterações: novo tipo ApiFailureKind (nao_configurada, sem_rede,
+  timeout, conexao, resposta_invalida, http); apiConfiguredUrl();
+  apiErrorLabel() com mensagens por situação/HTTP; log técnico
+  "Central DEV / API URL / Endpoint / HTTP / Erro" sem dados sensíveis.
+  Motivo: substituir o erro genérico por diagnóstico real. O transporte,
+  o timeout (8s) e o comportamento offline continuam os mesmos.
+
+src/components/DevCentral.tsx
+  Alterações: passou a exibir a mensagem classificada (inclusive
+  "API CENTRAL NÃO CONFIGURADA") em vez de "Sem comunicação"; ações
+  administrativas também usam apiErrorLabel(). Botão ATUALIZAR mantido,
+  sem polling ou retry novo.
+
+.env.example
+  Alteração: documentação de VITE_MONIT_API_URL, incluindo o
+  comportamento no navegador e no Electron. Nenhum valor real.
+
+Nada foi alterado em cadastro, frentes, colhedoras, tratores, caminhões,
+manutenções, base e terceiros, linha do tempo, cronograma, histórico,
+dashboard, alocação, moagem, backup, restauração ou exportação.
+Não foi criada nenhuma rota, API, autenticação, Installation ID ou
+Central adicional.
+
+4. CONFIGURAÇÃO DA API
+----------------------
+VITE_MONIT_API_URL é lida em apiBaseUrl():
+- se definida (https, ou http em localhost), é sempre a base usada;
+- se ausente, usa-se a própria origem SOMENTE quando ela for http:// ou
+  https:// (navegador/Preview);
+- no Electron a origem é app://monit.campo — ela nunca é aceita como
+  API; sem VITE_MONIT_API_URL no build, a Central DEV informa
+  "API CENTRAL NÃO CONFIGURADA" e o restante do sistema segue normal.
+Nenhum domínio, IP, token ou credencial fictícia foi adicionada.
+Segurança do Electron preservada: contextIsolation true,
+nodeIntegration false, sandbox true, webSecurity intacto.
+
+5. TESTES
+---------
+bunx tsgo --noEmit ............................ PASSOU
+npm run build ................................. PASSOU
+npm run electron:build ........................ PASSOU
+npm run lint .................................. NÃO CONCLUÍDO (excedeu o
+  tempo do ambiente). eslint executado nos arquivos alterados: apenas
+  divergências de aspas do prettier, já existentes em todo o projeto;
+  nenhum erro de código.
+npm run dist .................................. NÃO EXECUTADO (empacotamento
+  Windows exige Wine/Windows; limitação já registrada em
+  CHECKUP_EXE_MONIT_CAMPO.txt).
+
+API local (servidor de desenvolvimento, senha ADMIN):
+  POST /api/public/monit/admin/installations .. HTTP 200
+  POST /api/public/monit/admin/credentials .... HTTP 200
+  POST /api/public/monit/admin/locations ...... HTTP 200
+  POST admin/installations com senha errada ... HTTP 401 (tratado)
+  GET  /health ................................ HTTP 200
+
+Sem URL configurada e origem não http(s): apiPost devolve
+kind=nao_configurada e a Central DEV mostra "API CENTRAL NÃO CONFIGURADA"
+(caminho de código verificado por tipagem/compilação, não por execução no
+Electron gráfico).
+
+Electron gráfico (startup/login/Alt+F12 na janela real): NÃO EXECUTADO —
+não há ambiente gráfico Windows/Wine disponível aqui. O mesmo código foi
+validado no build web.
+
+6. PENDÊNCIAS
+-------------
+- A correção do hash só passa a valer na aplicação publicada após uma
+  nova publicação do projeto.
+- Não existe API Central hospedada separadamente. Hoje a API mínima é
+  servida pela própria aplicação. Para o Electron é obrigatório definir
+  VITE_MONIT_API_URL no momento do build, apontando para o endereço real
+  onde a aplicação estiver publicada.
+- npm run dist e o teste gráfico do executável precisam ser executados em
+  Windows.

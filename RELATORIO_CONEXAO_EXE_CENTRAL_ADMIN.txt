@@ -1,0 +1,160 @@
+RELATORIO — CONEXAO MONIT.CAMPO.EXE COM A CENTRAL EXTERNA E EMPACOTAMENTO
+=========================================================================
+
+1. ARQUIVOS ALTERADOS
+- electron/main.cjs      : removida a geracao duplicada de Installation ID
+                           (padrao MC-XXXXXXXX, crypto.randomBytes, arquivos
+                           installation.json) e os canais IPC 'central:verify',
+                           'central:installation-info' e 'central:system-metrics'.
+                           Preservados: protocolo app://, janela, controles de
+                           janela, instancia unica, links externos, seguranca.
+- electron/preload.cjs   : removidos developerLogin, installationInfo e
+                           systemMetrics. Mantidos apenas os canais de janela
+                           usados por src/components/coa/WindowControls.tsx.
+- desktop/index.html     : CSP connect-src passou a aceitar https: (necessario
+                           para consultar a Central externa de VITE_MONIT_API_URL).
+                           Demais diretivas inalteradas.
+- package.json           : version 1.0.0, main electron/main.cjs, scripts
+                           icons / build:electron / electron / dist e bloco
+                           electron-builder (appId com.monit.campo, productName
+                           MONIT.CAMPO, asar, NSIS, build/icon.ico).
+                           devDependencies: electron 33, electron-builder 25.
+NAO alterados: src/lib/access/*, src/hooks/useAuth.ts, rotas de API,
+vite.config.ts, vite.electron.config.ts, scripts/make-icons.mjs e todos os
+modulos operacionais (dashboard, frentes, colhedoras, tratores, caminhoes,
+manutencoes, base/terceiros, linha do tempo, cronograma, historico, moagem,
+cadastro, paradas, backup/restauracao, exportacoes, configuracoes).
+
+2. INSTALLATION ID
+Implementacao unica em src/lib/access/local.ts: UUID aleatorio persistido na
+pasta CHAVE (localStorage). Nao existe mais nenhum segundo identificador; o
+processo principal do Electron nao gera nem grava identidade.
+
+3. CONEXAO EXTERNA
+Camada unica src/lib/access/api.ts. Base = VITE_MONIT_API_URL (nenhuma URL
+inventada; valor vazio no .env.example). No Electron a origem app://monit.campo
+nunca e usada como API. Nenhum token, senha ou service role no frontend.
+
+4. ENDPOINT USADO PELO EXE
+POST {VITE_MONIT_API_URL}/api/public/monit/installations
+corpo: { installation_id: UUID, name: "Instalacao" }
+resposta: { ok: true, status: "pendente" | "autorizada" | "bloqueada" }
+Nenhum dado operacional e enviado.
+
+5. AUTORIZADA : funcionamento normal; status salvo no cofre local existente.
+6. PENDENTE   : comportamento local existente preservado (nao equivale a bloqueio).
+7. BLOQUEADA  : sessao encerrada e acesso impedido, com a mensagem existente de
+                instalacao bloqueada. Nenhum dado, backup ou configuracao apagado.
+8. OFFLINE    : timeout, DNS, conexao recusada, 500/502/503 sao tratados em
+                api.ts como "sem comunicacao"; o aplicativo segue com o ultimo
+                estado valido do cofre. Sem tela branca e sem bloqueio de startup.
+9. SINCRONIZACAO: unico timer existente em useAuth.ts (10 minutos). Nenhum
+                segundo timer, heartbeat, polling, WebSocket ou Realtime.
+10. ROTAS LOCAIS: src/routes/api/public/monit/* permanecem como Central local/
+                legado do build web e nao foram apagadas. Com VITE_MONIT_API_URL
+                configurado, api.ts prioriza a URL externa; no Electron, sem essa
+                variavel, nao ha base HTTP alguma, portanto o .exe nunca chama as
+                rotas locais.
+11. ADMIN     : credencial ADMIN e PBKDF2 preservados; nenhuma senha em texto puro.
+12. ELECTRON  : carrega app://monit.campo/index.html a partir de dist-electron,
+                com contextIsolation: true, nodeIntegration: false, sandbox: true,
+                webSecurity: true e asar habilitado.
+13. ICONE     : script "icons" (scripts/make-icons.mjs) gera build/icon.ico e
+                build/icon.png a partir de public/icon.png. Nenhuma lib nova.
+
+14. COMANDOS EXECUTADOS E RESULTADOS
+- npm install --save-dev electron@33 electron-builder@25 .... OK
+- npm run build (web / TanStack Start + Nitro) ............... OK
+- npm run build:electron (icones + vite.electron.config.ts) .. OK (dist-electron gerado)
+- npm run dist (electron-builder --win nsis) ................. PARCIAL
+
+15. LIMITACOES (nao inventadas)
+- npm run dist nao concluiu neste ambiente Linux: o empacotamento Windows chega
+  a gerar release/win-unpacked/MONIT.CAMPO.exe, mas a etapa "updating asar
+  integrity executable resource" depende de Wine e nao finaliza aqui. O arquivo
+  MONIT.CAMPO-Setup-1.0.0.exe deve ser gerado em uma maquina Windows com
+  "npm run dist" (configuracao ja pronta no package.json).
+- Por consequencia, os testes 1 a 11 do item 23 do pedido (inicio do aplicativo,
+  janela, icone, login, permanencia do Installation ID, consulta a Central,
+  bloqueio, autorizacao, ausencia de internet, reabertura e troca de versao)
+  NAO foram executados: exigem o instalador rodando em Windows.
+- npm run lint continua reportando apontamentos de formatacao preexistentes
+  (prettier), nao relacionados a estas alteracoes.
+
+================================================================
+16) VALIDAÇÃO FINAL — LOGIN LOCAL + STATUS REMOTO (14/09/2026)
+================================================================
+- useAuth.ts PRECISAVA de alteração: o login chamava
+  POST /api/public/monit/auth/check enviando { installation_id, password },
+  ou seja, a senha do usuário trafegava para a Central. Reescrito.
+- auth/check: era usado SOMENTE pelo login do useAuth.ts (o Admin Web usa
+  apenas /admin/installations). Dependência removida do cliente, a constante
+  ACCESS_ENDPOINTS.authCheck foi excluída de protocol.ts e a rota
+  src/routes/api/public/monit/auth/check.ts foi apagada.
+- Senha: 100% local. Conferência exclusiva por verifyLocalPassword()
+  (cofre AES-GCM + PBKDF2 100000 iterações, credencial inicial ADMIN em
+  salt+hash). Nenhum endpoint remoto recebe campo "password" a partir do
+  .exe. Sessão local, ADMIN e funcionamento offline preservados.
+- Status remoto: consulta única em consultarStatus() usando o mesmo e único
+  endpoint POST {VITE_MONIT_API_URL}/api/public/monit/installations com
+  { installation_id: UUID, name }. Usada no login e no timer já existente
+  (10 min). Nenhum segundo timer, retry ou mecanismo de bloqueio criado.
+  bloqueada => encerra sessão e mostra a mensagem existente;
+  autorizada => uso normal; pendente => uso local normal;
+  sem comunicação (timeout/DNS/recusa/500/502/503) => último estado válido
+  do cofre local, sem bloquear o aplicativo.
+- Installation ID: continua único, UUID persistente em
+  src/lib/access/local.ts. Nenhum identificador novo.
+- VITE_MONIT_API_URL: única origem da URL externa, lida somente em
+  src/lib/access/api.ts. Como é variável de BUILD, ela precisa existir no
+  ambiente/arquivo .env NO MOMENTO de `npm run build:electron`; definir a
+  variável depois de empacotar NÃO chega ao .exe (seria necessário
+  reempacotar). .env.example mantém `VITE_MONIT_API_URL=` vazio.
+- Testes executados: tsgo --noEmit OK; npm run build:electron OK;
+  npm run build OK. npm run lint continua reportando apenas divergências
+  de formatação Prettier preexistentes. NÃO foram executados testes do
+  instalador Windows nem testes automatizados de acesso (não existem no
+  projeto).
+
+================================================================
+17) ULTIMA AUDITORIA — REMOCAO DA DEPENDENCIA DE AUTH/CHECK (15/09/2026)
+================================================================
+- auth/check AINDA ERA UTILIZADO? Nao. A rota
+  src/routes/api/public/monit/auth/check.ts ja havia sido removida na
+  validacao anterior (item 16), junto com ACCESS_ENDPOINTS.authCheck.
+  Esta auditoria confirmou por busca que nao existe mais nenhum arquivo
+  nem nenhuma referencia a "/api/public/monit/auth/check", "authCheck"
+  ou "AuthCheckResponse" em todo o src/.
+- REFERENCIAS ENCONTRADAS nesta auditoria:
+  * src/lib/access/db.server.ts: activeDigests() (sem nenhum consumidor —
+    era usada somente pelo antigo auth/check) => REMOVIDA.
+  * src/lib/access/db.server.ts: matchCredential() e activeAdminDigests()
+    => MANTIDAS, usadas por requireAdmin(), que protege
+    /api/public/monit/admin/installations (Admin Web).
+  * src/routes/api/public/monit/installations.ts usa apenas db().
+  * src/hooks/useAuth.ts: unica ocorrencia de "password" e o parametro do
+    login, entregue somente a verifyLocalPassword(). Nenhum envio remoto.
+  * src/lib/access/api.ts: nenhuma referencia a credenciais.
+- ROTA REMOVIDA OU MANTIDA: removida (no item 16); nesta auditoria apenas
+  o codigo servidor que ficou sem uso por causa dela (activeDigests) foi
+  excluido. Nenhum endpoint substituto foi criado.
+- O .EXE NAO ENVIA SENHA: confirmado por leitura de codigo. A unica chamada
+  remota do aplicativo e POST {VITE_MONIT_API_URL}/api/public/monit/installations
+  com corpo { installation_id, name }. Nao ha campo password, credential,
+  hash, salt ou credentials em nenhuma requisicao do cliente.
+- LOGIN LOCAL: 100% local via verifyLocalPassword() (cofre AES-GCM +
+  PBKDF2 100000 iteracoes, credencial inicial ADMIN em salt+hash), com
+  sessao local e funcionamento offline preservados. Nenhum segundo sistema
+  de autenticacao, segundo Installation ID ou segundo timer foi criado.
+- CENTRAL EXTERNA: controla exclusivamente o estado da instalacao
+  (pendente | autorizada | bloqueada).
+- ELECTRON: app://monit.campo usa VITE_MONIT_API_URL somente para consultar
+  o status da instalacao; nao existe (nem pode existir) chamada a
+  auth/check, pois a rota e a constante nao existem mais no codigo.
+- TESTES EXECUTADOS AGORA: npm run build OK; npm run build:electron OK;
+  eslint sobre src/lib/access, src/hooks/useAuth.ts e src/routes/api
+  reporta apenas 169 divergencias de formatacao Prettier preexistentes
+  (aspas), nenhum erro de codigo. NAO EXECUTADO: npm run lint completo
+  (excede o tempo limite deste ambiente) e nao existem testes automatizados
+  de acesso no projeto. O instalador Windows continua nao gerado aqui
+  (limitacao do item 15).

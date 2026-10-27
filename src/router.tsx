@@ -1,3 +1,7 @@
+/**
+ * MONIT.CAMPO
+ * Autor e criador: Rafael Regiolli de Souza
+ */
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";

@@ -1,0 +1,44 @@
+import { describe, it, expect } from 'vitest';
+import { parseTruckBase, truckDate, truckNumber, prepareTruckBase, analyzeTrucks, truckPercent, truckClass, type TruckPoint, type TruckFilters } from './truckTimeline';
+const header = 'Equipamento;Data/Hora;Estado;Estado Operacional;Grupo Operacao;Operacao;Velocidade;Motor Ligado;Hodometro;RPM Motor';
+const line = (time: string, state='PARADA', operation='Aguardando carregamento', fleet='100', speed='0', odo='100') => `${fleet};03/10/2026 ${time};${state};TRANSPORTE CANA VAZIO;${state==='PARADA'?'IMPRODUTIVO':'PRODUTIVA'};${operation};${speed};1;${odo};800`;
+const parse = (lines: string[]) => parseTruckBase([header,...lines].join('\n'));
+const point = (time: string, overrides: Partial<TruckPoint> = {}): TruckPoint => ({ equipamento:'100',dt:new Date(time),descricao:'',frente:'SEM',grupoFrente:'',operacao:'Aguardando',estado:'PARADA',estadoOp:'TRANSPORTE CANA VAZIO',operador:'',horimetro:0,velocidade:0,categoria:'canavieiro',grupoOperacao:'IMPRODUTIVO',hodometro:100,rpm:800,motorLigado:1,...overrides });
+const filters = (base: ReturnType<typeof prepareTruckBase>, overrides: Partial<TruckFilters> = {}): TruckFilters => ({start:base.start,end:base.end,fleet:'',shift:'',operation:'',state:'',operationalState:'',group:'',motor:'',maxGapMinutes:5,speedBins:[5,10,20,30,40,50],...overrides});
+const analyze = (rows: TruckPoint[], changes: Partial<TruckFilters>={}) => {const b=prepareTruckBase(rows);return analyzeTrucks(b,filters(b,changes));};
+describe('Truck telemetry from real headers',()=>{
+ it('reads semicolon fields by name, distinguishes states and converts decimal comma',()=>{
+  const r=parse([line('06:00:02','DESLOCAMENTO','Transporte','48050','12,5','1.234,5')]);
+  expect(r.rows).toHaveLength(1);expect(r.rows[0].estado).toBe('DESLOCAMENTO');expect(r.rows[0].estadoOp).toBe('TRANSPORTE CANA VAZIO');expect(r.rows[0].velocidade).toBe(12.5);expect(r.rows[0].hodometro).toBe(1234.5);expect(r.rows[0].rpm).toBe(800);
+ });
+ it('rejects invalid dates and fleets, reports duplicate lines, ignores blanks',()=>{
+  const r=parse([line('06:00:02'),line('06:00:02'),line('25:00:00'),line('06:01:00','PARADA','Teste',''),'']);
+  expect(r.rows).toHaveLength(1);expect(r.invalid).toBe(2);expect(r.duplicates).toBe(1);expect(r.totalLines).toBe(4);expect(r.issues).toHaveLength(2);
+ });
+ it('preserves missing numeric and motor values rather than interpreting them as zero',()=>{
+  const r=parse(['100;03/10/2026 06:00:02;PARADA;;;Teste;;;;']);
+  expect(r.rows).toHaveLength(1);expect(Number.isNaN(r.rows[0].velocidade)).toBe(true);expect(r.rows[0].hodometro).toBeNull();expect(r.rows[0].motorLigado).toBeNull();expect(truckNumber('-1')).toBeNull();expect(truckDate('31/02/2026 06:00:00')).toBeNull();
+ });
+ it('requires named mandatory columns and permits reordered header',()=>{
+  expect(parseTruckBase('Data/Hora;Estado\n03/10/2026 06:00:02;PARADA').rows).toHaveLength(0);
+  const r=parseTruckBase('Operacao;Estado;Data/Hora;Equipamento\nTeste;PARADA;03/10/2026 06:00:02;48050');expect(r.rows[0].equipamento).toBe('48050');
+ });
+});
+describe('Truck single interval source',()=>{
+ const rows=[point('2026-10-03T06:00:00'),point('2026-10-03T06:02:00'),point('2026-10-03T06:04:00',{estado:'DESLOCAMENTO',grupoOperacao:'PRODUTIVA',velocidade:20}),point('2026-10-03T06:06:00',{estado:'DESLOCAMENTO',velocidade:0})];
+ it('counts observations separately and groups continuous stop occurrences',()=>{const r=analyze(rows);expect(r.total.records).toBe(4);expect(r.stopRecords).toBe(2);expect(r.moveRecords).toBe(2);expect(r.total.stopOccurrences).toBe(1);expect(r.total.stop).toBeCloseTo(4/60);expect(r.total.move).toBeCloseTo(2/60);expect(r.total.stop+r.total.move).toBeCloseTo(6/60);});
+ it('clips intervals at period boundaries without extrapolation',()=>{const r=analyze(rows,{start:new Date('2026-10-03T06:01:00').getTime(),end:new Date('2026-10-03T06:05:00').getTime()});expect(r.total.stop).toBeCloseTo(3/60);expect(r.total.move).toBeCloseTo(1/60);expect(r.total.records).toBe(2);});
+ it('filters interval state before clipping, not by removing intervening observations',()=>{const r=analyze(rows,{state:'PARADA'});expect(r.total.stop).toBeCloseTo(4/60);expect(r.total.move).toBe(0);expect(r.total.records).toBe(2);});
+ it('applies fleet, operation, group, operational state and motor filters together',()=>{const r=analyze([...rows,...rows.map(p=>({...p,equipamento:'200'}))],{fleet:'100',operation:'Aguardando',group:'IMPRODUTIVO',operationalState:'TRANSPORTE CANA VAZIO',motor:'1',state:'PARADA'});expect(r.total.records).toBe(2);expect(r.fleetCount).toBe(1);expect(r.total.stop).toBeCloseTo(4/60);});
+ it('never assigns long gaps to a recorded state, even when selection is small',()=>{const r=analyze([point('2026-10-03T06:00:00'),point('2026-10-03T08:00:00')],{start:new Date('2026-10-03T07:00:00').getTime(),end:new Date('2026-10-03T07:02:00').getTime()});expect(r.total.stop).toBe(0);expect(r.total.gap).toBeCloseTo(2/60);expect(r.gapIntervals).toBe(1);expect(r.fleetCount).toBe(0);expect(r.hourly[0].paradaRecords).toBeNull();});
+ it('respects configurable gap threshold and does not mutate source',()=>{const snapshot=rows.map(p=>({...p}));expect(analyze(rows,{maxGapMinutes:1}).total.gap).toBeCloseTo(6/60);expect(analyze(rows,{maxGapMinutes:2}).total.gap).toBe(0);expect(rows).toEqual(snapshot);});
+ it('splits official A/B shifts at 14h',()=>{const r=analyze([point('2026-10-03T13:59:00'),point('2026-10-03T14:01:00')],{shift:'B'});expect(r.total.stop).toBeCloseTo(1/60);expect(r.total.records).toBe(1);});
+ it('keeps C shift chronological across midnight and splits hour duration',()=>{const r=analyze([point('2026-10-03T23:59:00'),point('2026-10-04T00:01:00')],{shift:'C'});expect(r.total.stop).toBeCloseTo(2/60);expect(r.hourly).toHaveLength(2);expect(r.hourly[0].paradaHours).toBeCloseTo(1/60);expect(r.hourly[1].paradaHours).toBeCloseTo(1/60);});
+ it('invalidates ambiguous same-fleet timestamps without double counting',()=>{const r=analyze([point('2026-10-03T06:00:00'),point('2026-10-03T06:00:00',{estado:'DESLOCAMENTO'}),point('2026-10-03T06:02:00')]);expect(r.total.stop+r.total.move).toBe(0);expect(r.total.gap).toBeCloseTo(2/60);});
+ it('derives odometer distance from differences and ignores negative or inconsistent changes',()=>{const r=analyze([point('2026-10-03T06:00:00',{hodometro:100}),point('2026-10-03T06:02:00',{hodometro:101}),point('2026-10-03T06:04:00',{hodometro:0}),point('2026-10-03T06:06:00',{hodometro:10000})]);expect(r.total.distance).toBe(1);expect(r.badOdometer).toBe(2);});
+ it('attributes empty/loaded intervals only to their initial operational state',()=>{const r=analyze([point('2026-10-03T06:00:00',{estado:'DESLOCAMENTO',hodometro:100}),point('2026-10-03T06:02:00',{estado:'DESLOCAMENTO',estadoOp:'TRANSPORTE CANA CARREGADO',hodometro:101}),point('2026-10-03T06:04:00',{estado:'DESLOCAMENTO',estadoOp:'TRANSPORTE CANA CARREGADO',hodometro:102})]);expect(r.cargo[0].move).toBeCloseTo(2/60);expect(r.cargo[1].move).toBeCloseTo(2/60);expect(r.total.distance).toBe(2);});
+ it('classifies maintenance only with PARADA and keeps unsupported productivity unclassified',()=>{expect(truckClass(point('2026-10-03T06:00:00',{grupoOperacao:'MANUTENÇÃO',estado:'DESLOCAMENTO'}))).toBe('naoClassificado');expect(truckClass(point('2026-10-03T06:00:00',{grupoOperacao:'MANUTENÇÃO'}))).toBe('manutencao');expect(truckClass(point('2026-10-03T06:00:00',{grupoOperacao:'PRODUTIVA',estadoOp:''}))).toBe('naoClassificado');});
+ it('calculates speed bins, zero-speed duration and motor changes from valid data',()=>{const r=analyze([point('2026-10-03T06:00:00',{velocidade:5}),point('2026-10-03T06:02:00',{estado:'DESLOCAMENTO',velocidade:0,motorLigado:0}),point('2026-10-03T06:04:00',{estado:'DESLOCAMENTO',velocidade:10})]);expect(r.histogram[0].records).toBe(2);expect(r.histogram[1].records).toBe(1);expect(r.total.zero).toBeCloseTo(2/60);expect(r.motorChanges).toBe(1);expect(truckPercent(r.total.zero,r.total.speedKnownMove)).toBe(100);expect(truckPercent(0,0)).toBe(0);});
+ it('substituting and clearing datasets never retains old points',()=>{const first=analyze(rows);const second=analyze([point('2026-10-05T06:00:00',{equipamento:'999'})]);expect(first.total.records).toBe(4);expect(second.total.records).toBe(1);expect(second.fleets.map(p=>p.name)).toEqual(['999']);expect(analyze([]).total.records).toBe(0);});
+ it('processes 100,000 generated test observations without truncation',()=>{const big=Array.from({length:100000},(_,i)=>point(new Date(2026,9,3,6,0,i).toISOString(),{equipamento:String(i%50)}));const r=analyze(big);expect(r.total.records).toBe(100000);expect(r.fleetCount).toBe(50);expect(r.stopRecords).toBe(100000);expect(r.total.stop).toBeCloseTo((100000-50)*50/3600);},20000);
+});

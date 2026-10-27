@@ -1,3 +1,7 @@
+/**
+ * MONIT.CAMPO
+ * Autor e criador: Rafael Regiolli de Souza
+ */
 // Captures the original Error out-of-band so server.ts can recover the stack
 // when h3 has already swallowed the throw into a generic 500 Response.
 
