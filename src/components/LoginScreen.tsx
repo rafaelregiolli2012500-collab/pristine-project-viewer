@@ -58,13 +58,13 @@ export function LoginScreen({ onLogin, aviso }: Props) {
     >
       <div className="absolute inset-0 bg-background/55" aria-hidden="true" />
 
-      {/* Ícone discreto — Acesso administrativo (Painel Central) */}
+      {/* Ícone discreto — Acesso administrativo (Painel Central) — canto superior esquerdo */}
       <button
         type="button"
         onClick={openAdmin}
         title="Acesso administrativo"
         aria-label="Acesso administrativo"
-        className="absolute top-4 right-4 z-20 p-2 rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-background/40 transition-colors"
+        className="absolute top-4 left-4 z-20 p-2 rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-background/40 transition-colors"
       >
         <Shield className="h-5 w-5" />
       </button>
