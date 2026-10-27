@@ -1,3 +1,7 @@
+/**
+ * MONIT.CAMPO
+ * Autor e criador: Rafael Regiolli de Souza
+ */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -6,8 +10,8 @@ import {
   useRouter,
   HeadContent,
   Scripts,
-  type ErrorComponentProps,
 } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
@@ -78,21 +82,35 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "MONIT.CAMPO — Controle de Manutenção Agrícola" },
+      {
+        name: "description",
+        content:
+          "Sistema de controle de manutenção e logística de colhedoras, tratores, transbordos e caminhões.",
+      },
+      { name: "author", content: "MONIT.CAMPO" },
+      { name: "theme-color", content: "#0b1220" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { property: "og:title", content: "MONIT.CAMPO — Controle de Manutenção Agrícola" },
+      { name: "twitter:title", content: "MONIT.CAMPO — Controle de Manutenção Agrícola" },
+      { property: "og:description", content: "Sistema de controle de manutenção e logística de colhedoras, tratores, transbordos e caminhões." },
+      { name: "twitter:description", content: "Sistema de controle de manutenção e logística de colhedoras, tratores, transbordos e caminhões." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/228a56159e1e4b2baabf1fde0e8b8e0a/id-preview-9972a36e--7a66ddfc-8950-4294-8fab-3416fc15f0c4.lovable.app-1786963998091.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/228a56159e1e4b2baabf1fde0e8b8e0a/id-preview-9972a36e--7a66ddfc-8950-4294-8fab-3416fc15f0c4.lovable.app-1786963998091.png" },
     ],
     links: [
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
     ],
   }),
   shellComponent: RootShell,

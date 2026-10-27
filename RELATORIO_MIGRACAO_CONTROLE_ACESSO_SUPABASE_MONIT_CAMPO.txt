@@ -1,0 +1,147 @@
+====================================================================
+RELATORIO DE MIGRACAO DO CONTROLE DE ACESSO — MONIT.CAMPO
+Fonte de verdade: PROJETO-MONIT.EXE-main.zip
+Data do relatorio: 16/09/2026
+====================================================================
+
+1. OBJETIVO E ESCOPO
+--------------------------------------------------------------------
+Migrado exclusivamente o CONTROLE DE ACESSO da instalacao:
+  MONIT.CAMPO.EXE  ->  chamada direta ao banco (RPC)  ->  PostgreSQL
+Removida a API intermediaria antiga.
+Preservados sem alteracao funcional: login local por senha, geracao e
+persistencia do Installation ID unico e todos os modulos operacionais.
+
+NAO foi implementado (conforme exigido): telemetria, heartbeat,
+WebSocket, Realtime, localizacao/GPS, envio de senha ao servidor,
+API intermediaria.
+
+2. ESTRUTURA CRIADA NO BANCO
+--------------------------------------------------------------------
+Tabela  public.installations
+  - id (uuid, PK), installation_id (texto unico), name (texto),
+    status (pendente | autorizada | bloqueada), created_at, updated_at
+  - RLS habilitada com politica de negacao total para os papeis do
+    aplicativo (anon / authenticated)
+  - Privilegios diretos de SELECT/INSERT/UPDATE/DELETE revogados para
+    os papeis do aplicativo
+
+Funcao  public.monit_installation_access(p_installation_id, p_name)
+  - SECURITY DEFINER, SET search_path = public
+  - valida o formato do identificador (UUID)
+  - cadastra a instalacao como "pendente" na primeira execucao, sem
+    duplicar registros
+  - retorna SOMENTE name e status da propria instalacao consultada
+  - nao permite ao aplicativo criar, alterar ou apagar status
+  - somente EXECUTE concedido aos papeis do aplicativo
+
+3. ALTERACOES NO APLICATIVO
+--------------------------------------------------------------------
+Criado    src/lib/access/remote.ts        consulta direta via RPC,
+                                          timeout de 8s, validacao do
+                                          retorno; qualquer falha de
+                                          rede/DNS/timeout/5xx/resposta
+                                          invalida vira "sem
+                                          comunicacao", NUNCA "bloqueada"
+Criado    src/components/InstallationGate.tsx  telas de verificando /
+                                          pendente / bloqueada / sem
+                                          estado, sem detalhes tecnicos
+Reescrito src/lib/access/protocol.ts      contrato apenas do novo fluxo
+Reescrito src/hooks/useAuth.ts            autorizada = libera;
+                                          pendente/bloqueada = nega;
+                                          sem comunicacao = usa ultimo
+                                          estado valido do cofre local;
+                                          sem estado anterior = nega;
+                                          consulta inicial + a cada 10
+                                          minutos; senha local so e
+                                          verificada apos autorizacao
+Editado   src/pages/Index.tsx             bloqueio antes da tela de login
+Editado   .env.example                    apenas nomes das variaveis
+                                          publicas do banco
+
+Removidos (API antiga e dependencias mapeadas antes da exclusao):
+  src/lib/access/api.ts
+  src/lib/access/db.server.ts
+  src/lib/access/guard.server.ts
+  src/routes/api/public/monit/ (installations e admin/installations)
+  src/routes/admin.tsx
+  src/routes/health.ts
+  src/integrations/supabase/cron-auth.ts
+Busca posterior no codigo: nenhuma referencia restante a
+VITE_MONIT_API_URL, ACCESS_ENDPOINTS, access/api, cron-auth ou rotas
+administrativas antigas.
+
+Preservado sem alteracao: src/lib/access/local.ts (Installation ID,
+cofre AES-GCM, senha local PBKDF2) e todos os modulos operacionais.
+
+4. TESTES EXECUTADOS E RESULTADOS
+--------------------------------------------------------------------
+4.1 SEGURANCA (chamadas reais com a chave publica do aplicativo)
+  SELECT direto na tabela ................ NEGADO (permission denied)
+  INSERT direto .......................... NEGADO (permission denied)
+  UPDATE de status ....................... NEGADO (permission denied)
+  DELETE ................................. NEGADO (permission denied)
+  RPC com identificador invalido ......... REJEITADO pela funcao
+  RPC da instalacao A ................ retorna somente A (pendente)
+  RPC da instalacao B ................ retorna somente B (pendente)
+  Conclusao: o aplicativo nao consegue listar, criar, alterar nem
+  apagar registros; nao ha como enumerar instalacoes. O unico acesso e
+  a consulta do proprio identificador aleatorio.
+
+4.2 ESTADOS DE ACESSO (aplicativo real, no navegador)
+  pendente ...... acesso negado, mensagem "Esta instalacao ainda nao
+                  foi autorizada. Entre em contato com o administrador."
+  autorizada .... tela de login liberada
+  bloqueada ..... acesso negado, mensagem "Esta instalacao esta
+                  bloqueada. Entre em contato com o administrador."
+  desbloqueio remoto (bloqueada -> autorizada) ..... acesso liberado
+                  novamente apos nova consulta
+
+4.3 OFFLINE / FALHA DE COMUNICACAO
+  Instalacao autorizada + rede cortada ... acesso mantido pelo cache
+                  local (nao caiu para bloqueada)
+  Primeira execucao sem comunicacao e sem estado anterior ... negado
+  Erros de rede, timeout, DNS e 5xx sao tratados como "sem
+  comunicacao" no codigo de consulta remota.
+
+4.4 PERSISTENCIA DO INSTALLATION ID
+  Identificador gerado uma unica vez e mantido no armazenamento local
+  (verificado no aplicativo em execucao: mesmo identificador em
+  recarregamentos sucessivos). Nenhuma alteracao no gerador original.
+
+4.5 QUALIDADE E BUILD
+  Verificacao de tipos (tsgo --noEmit) ......... OK, sem erros
+  Verificacao de codigo nos arquivos alterados . OK, sem problemas
+  Compilacao web/desktop (build:electron) ...... OK
+  Pacote gerado: nenhuma referencia a API antiga; nenhuma chave
+  administrativa/secreta presente (somente a chave publica).
+  Electron: contextIsolation true, nodeIntegration false, sandbox
+  true, webSecurity true.
+  Navegacao completa pelos 12 modulos apos o login: sem erros de
+  execucao no console.
+
+5. PENDENCIA CONHECIDA (NAO CONCLUIDO)
+--------------------------------------------------------------------
+5.1 Geracao do instalador Windows (npm run dist) NAO foi concluida
+    neste ambiente. A compilacao do aplicativo funciona, mas o
+    empacotamento/assinatura para Windows falha porque o ambiente de
+    build e Linux e a ferramenta de assinatura nao pode ser executada
+    (ERR_ELECTRON_BUILDER_CANNOT_EXECUTE na etapa de assinatura).
+    Isso e limitacao do ambiente, nao do codigo. O instalador deve ser
+    gerado em uma maquina Windows.
+
+5.2 Avisos do verificador de seguranca do banco:
+    "Public/Signed-In Users Can Execute SECURITY DEFINER Function".
+    Sao esperados e aceitos por decisao de arquitetura: o requisito
+    proibe API intermediaria, portanto o aplicativo precisa executar a
+    funcao sem login. A funcao foi endurecida (search_path fixo,
+    validacao de identificador, retorno apenas da propria linha,
+    nenhuma escrita de status pelo cliente, nenhum dado sensivel
+    exposto).
+
+6. CONCLUSAO
+--------------------------------------------------------------------
+A migracao do controle de acesso esta funcional e validada nos itens
+4.1 a 4.5. A unica etapa nao concluida e a geracao do instalador
+Windows (item 5.1), que exige ambiente Windows.
+====================================================================

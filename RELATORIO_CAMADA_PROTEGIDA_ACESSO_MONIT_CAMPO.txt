@@ -1,0 +1,109 @@
+RELATÓRIO — CAMADA PROTEGIDA DE CONECTIVIDADE E CONTROLE DE ACESSO
+MONIT.CAMPO — Autor e criador: Rafael Regiolli de Souza
+Data: 2026-09-18 (UTC)
+
+1) ARQUIVOS ENCONTRADOS (implementação real, já existente)
+   src/lib/access/remote.ts .......... chamada da RPC monit_installation_access
+   src/lib/access/local.ts ........... Installation ID + cofre do último estado
+   src/lib/access/protocol.ts ........ estados e contratos
+   src/lib/access/hash.ts ............ PBKDF2-SHA256 do login local
+   src/hooks/useAuth.ts .............. decisão de acesso + login local
+   src/components/InstallationGate.tsx tela de acesso negado/verificando
+   src/pages/Index.tsx ............... consome apenas useAuth() (sem Supabase)
+   src/integrations/supabase/client.ts cliente gerado (chave publicável)
+   .env.production / .env.development / .env.example / env.official.mjs
+
+   Nenhuma segunda implementação foi encontrada; nada foi duplicado.
+
+2) ARQUIVOS PROTEGIDOS
+   Listados em PROTECAO_CAMADA_ACESSO_MONIT_CAMPO.md e CAMADA_ACESSO_MANIFESTO.md.
+
+3) ALTERAÇÕES FEITAS (incrementais, sem tocar em nada operacional)
+   - NOVO src/lib/access/index.ts: interface única da camada
+     (getInstallationAccess, decidirAcesso, mensagemAcesso,
+     INTERVALO_RECONSULTA_MS). A lógica é a mesma que já existia, apenas
+     centralizada em um único ponto de entrada.
+   - src/hooks/useAuth.ts passou a consumir a interface única; timer único
+     mantido em 10 minutos; mensagens reexportadas para compatibilidade.
+   - NOVOS testes: src/lib/access/__tests__/access.test.ts e
+     installation-id.test.ts.
+   - NOVOS documentos: PROTECAO_CAMADA_ACESSO_MONIT_CAMPO.md e
+     CAMADA_ACESSO_MANIFESTO.md.
+   - package.json: scripts "test" (vitest run) e "test:access"; devDependency
+     vitest. Nenhum outro script alterado.
+
+4) FLUXO DE AUTORIZAÇÃO
+   Aplicação -> getInstallationAccess() -> Supabase JS -> HTTPS
+             -> RPC public.monit_installation_access(p_installation_id, p_name)
+             -> public.installations
+             -> autorizada = permitido | pendente = negado | bloqueada = negado
+
+5) INSTALLATION ID
+   Mecanismo preservado integralmente: UUID aleatório gerado uma única vez e
+   guardado em monit.campo/CHAVE/installation_id (armazenamento local),
+   independente dos dados operacionais e do backup/restauração.
+   Nenhum novo identificador foi criado.
+
+6) SUPABASE UTILIZADO
+   O projeto oficial já configurado no projeto (variáveis de ambiente
+   VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_PROJECT_ID).
+   Nada foi trocado, migrado ou recriado. Somente a chave publicável está no
+   cliente; nenhum segredo administrativo no frontend, preload, main ou .exe.
+
+7) RPC UTILIZADA
+   public.monit_installation_access(p_installation_id, p_name) — devolve
+   apenas name e status. Não aceita parâmetro de status.
+
+8) COMPORTAMENTO OFFLINE
+   Rede indisponível, DNS, timeout, conexão recusada, 4xx/5xx ou resposta
+   inválida = SEM COMUNICAÇÃO (nunca BLOQUEADO). Vale o último estado válido
+   do cofre local; sem estado válido conhecido, acesso permanece negado.
+
+9) PERIODICIDADE
+   Um único timer de 10 minutos (600000 ms). Sem heartbeat, polling duplicado,
+   WebSocket, Realtime ou telemetria.
+
+10) TESTES REALIZADOS E RESULTADOS
+   a) npm run test:access (vitest) — 12 testes, TODOS PASSARAM:
+      - instalação nova -> pendente -> acesso negado
+      - autorizada -> acesso permitido
+      - bloqueada -> acesso negado
+      - alteração remota autorizada -> bloqueada reconhecida na próxima consulta
+      - desbloqueio bloqueada -> autorizada reconhecido na próxima consulta
+      - offline com último estado válido não vira bloqueio (e não sobrescreve cofre)
+      - offline sem estado válido permanece negado
+      - regra e mensagens de pendente/bloqueada/sem estado
+      - periodicidade única de 10 minutos
+      - Installation ID: UUID, único e estável entre execuções
+      - prefixo de chaves da camada separado dos dados operacionais
+   b) Segurança contra o banco oficial, com a chave publicável:
+      RPC válida ................................. HTTP 200, retorna pendente
+      RPC com p_status forçado ................... HTTP 404 (assinatura inexistente)
+      SELECT direto em installations ............. HTTP 401 permission denied
+      INSERT direto .............................. HTTP 401 permission denied
+      UPDATE direto (tentando autorizar-se) ...... HTTP 401 permission denied
+      DELETE direto .............................. HTTP 401 permission denied
+      Consulta de outra instalação por REST ...... negada (sem SELECT)
+   c) Verificação de tipos: npx tsgo --noEmit — sem erros.
+   d) npm run build — sucesso. Build do preview: "build OK".
+
+11) REGRESSÃO OPERACIONAL
+   Nenhum arquivo operacional foi alterado: Dashboard, Manutenções, Base e
+   Terceiros, Colhedoras, Tratores, Caminhões, Linha do Tempo, Cronograma,
+   Histórico, Moagem, Cadastro, Frentes, gráficos, filtros, exportações,
+   backup e restauração permanecem exatamente como estavam. O login local
+   (PBKDF2, senha nunca sai do computador) foi preservado e continua sendo
+   exibido somente após a autorização remota.
+
+12) POSSÍVEIS RISCOS / PENDÊNCIAS
+   - npm run lint continua acusando milhares de apontamentos de formatação
+     (prettier) PREEXISTENTES em módulos operacionais não tocados aqui; não
+     foram corrigidos para evitar reformatação massiva do projeto.
+   - Autorizar uma instalação continua sendo ação manual do administrador no
+     banco — por desenho, o aplicativo não pode fazer isso.
+   - npm run dist (instalador Windows) exige máquina Windows; aqui só é
+     possível compilar (build/build:electron).
+
+13) CONCLUSÃO
+   Camada protegida criada, centralizada, documentada e coberta por testes,
+   sem alteração de funcionalidades operacionais.

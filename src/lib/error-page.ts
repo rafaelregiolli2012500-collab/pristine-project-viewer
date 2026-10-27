@@ -1,3 +1,7 @@
+/**
+ * MONIT.CAMPO
+ * Autor e criador: Rafael Regiolli de Souza
+ */
 export function renderErrorPage(): string {
   return `<!doctype html>
 <html lang="en">

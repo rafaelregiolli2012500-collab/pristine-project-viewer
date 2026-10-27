@@ -1,0 +1,97 @@
+RELATÓRIO — ENXUGAMENTO DA CENTRAL E BLOQUEIO/DESBLOQUEIO REMOTO
+MONIT.CAMPO — Autor e criador: Rafael Regiolli de Souza
+
+1. ARQUITETURA ENCONTRADA
+- Installation ID (UUID) persistente em src/lib/access/local.ts + cofre local criptografado (AES-GCM) com situação e credenciais (salt + hash).
+- Login por senha em src/hooks/useAuth.ts, com sincronização periódica (10 min) da situação da instalação.
+- API mínima: /api/public/monit/installations, /auth/check, /admin/installations, /admin/credentials, /admin/locations, /location.
+- Central DEV completa dentro do .exe (src/components/DevCentral.tsx, ALT + F12) com credenciais e localizações.
+- Envio periódico de localização aproximada (src/lib/access/location.ts).
+- Banco: installations, access_credentials, locations. Nenhuma tabela installation_events e nenhum campo de telemetria (CPU/RAM/uptime/last_seen) foi encontrado — não havia telemetria para remover.
+
+2. CÓDIGO REAPROVEITADO (sem reimplementação)
+- Installation ID e cofre local: src/lib/access/local.ts (preservado integralmente).
+- Hash PBKDF2: src/lib/access/hash.ts (PBKDF2_ITERATIONS = 100000 preservado).
+- Camada única de comunicação: src/lib/access/api.ts.
+- Proteções de API: src/lib/access/guard.server.ts (rate limit, limite de corpo, JSON seguro).
+- Credencial administrativa: src/lib/access/db.server.ts (requireAdmin) — reaproveitada pelo Admin Web.
+- Rotas reaproveitadas: /installations, /auth/check, /admin/installations.
+- Sincronização periódica existente em useAuth (um único timer) — não foi criado outro.
+
+3. CÓDIGO REMOVIDO
+- src/components/DevCentral.tsx — Central administrativa completa dentro do .exe. Removida porque a administração passou a ser web e separada.
+- src/lib/access/location.ts — envio de localização. Removido: localização não faz parte do objetivo.
+- src/routes/api/public/monit/location.ts — recebimento de localização. Sem uso após a remoção acima.
+- src/routes/api/public/monit/admin/locations.ts — administração de localizações. Sem uso.
+- src/routes/api/public/monit/admin/credentials.ts — administração de credenciais. Usada apenas pela Central DEV removida.
+- src/pages/Index.tsx — atalho ALT + F12, listener de teclado, renderização da Central DEV e chamada startLocationSync().
+- src/hooks/useAuth.ts — verifyAdminPassword (só existia para a Central DEV do .exe).
+- src/lib/access/protocol.ts — endpoints location/adminCredentials/adminLocations, LocationRow, roundCoordinate, isLatitude, isLongitude, CredentialRow.
+- src/routes/api/public/monit/admin/installations.ts — ações "excluir" e "renomear" (administração desnecessária ao objetivo).
+- Nenhum código de Telegram, WebSocket, Realtime, heartbeat ou eventos existia; nada foi criado.
+
+4. CÓDIGO ALTERADO
+- src/pages/Index.tsx — mantido apenas o registro do nome da instalação (unidade ativa); nada operacional foi tocado.
+- src/hooks/useAuth.ts — enxugado (sem verifyAdminPassword). Fluxo de login, offline e bloqueio preservados.
+- src/lib/access/protocol.ts — contrato reduzido a instalações/autorização.
+- src/routes/api/public/monit/admin/installations.ts — ações reduzidas a listar | bloquear | desbloquear.
+- src/routes/admin.tsx — NOVO: Admin Web (única criação), responsivo, com login por senha, lista de instalações e bloqueio/desbloqueio com confirmação.
+
+5. API FINAL (somente rotas utilizadas)
+- POST /api/public/monit/installations — registro idempotente + consulta da situação (usada pelo .exe).
+- POST /api/public/monit/auth/check — verificação da senha + situação + pacote de credenciais para uso offline.
+- POST /api/public/monit/admin/installations — listar | bloquear | desbloquear (usada pelo Admin Web, exige senha administrativa).
+- GET /health — disponibilidade técnica.
+
+6. BANCO FINAL
+- installations: installation_id, name, status (pendente | autorizada | bloqueada), created_at, updated_at. Finalidade: controle de acesso.
+- access_credentials: credencial de login (salt + hash, status, is_admin). Finalidade: login do MONIT.CAMPO e autenticação administrativa.
+- locations: NÃO é mais usada por nenhum código. A remoção da tabela foi proposta em migration e NÃO foi autorizada pelo responsável; a tabela permanece no banco, inerte. Pode ser removida quando autorizado.
+- Migration aplicada: alinhamento da credencial ADMIN do banco à credencial inicial do aplicativo (salt + hash; nunca senha em texto puro), pois o hash gravado não correspondia à derivação atual e impedia a autenticação administrativa online.
+- Migrations históricas não foram editadas.
+
+7. DEPENDÊNCIAS REMOVIDAS (validadas por busca de imports em src, electron e vite.config)
+- jspdf — nenhum import; a impressão usa PrintView + html2canvas.
+- @hookform/resolvers — nenhum import.
+- zod — nenhum import.
+Mantidas por uso comprovado: html2canvas, html2canvas-pro, xlsx, recharts, lucide-react, radix/shadcn, @fontsource* (importadas em src/desktop/main.tsx), tailwindcss e tw-animate-css (importadas em src/styles.css), @tailwindcss/vite, @tanstack/router-plugin, vite-tsconfig-paths (usadas no vite.config.ts), react-hook-form (usada por src/components/ui/form.tsx).
+
+8. INSTALLATION ID
+Implementação existente preservada (UUID em localStorage, chave monit.campo/CHAVE/installation_id). Não foi criado segundo identificador, nem alterado o formato. Não entra em backup/restauração dos dados operacionais.
+
+9. OFFLINE
+Falha, timeout, DNS, conexão recusada, 4xx/5xx e resposta inválida são tratados como "sem comunicação": o MONIT.CAMPO continua funcionando com a última autorização válida do cofre local e o login offline usa o cache de credenciais. Ausência de internet nunca bloqueia. Nova tentativa na próxima sincronização.
+
+10. BLOQUEIO
+Admin Web → bloquear → status = bloqueada no banco. Na próxima consulta (login ou sincronização periódica), o aplicativo recebe "bloqueada", atualiza o cofre local, encerra a sessão, impede novo login e mostra a mensagem de bloqueio. Nenhum dado operacional, configuração, backup ou Installation ID é apagado.
+
+11. DESBLOQUEIO
+Admin Web → desbloquear → status = autorizada. Na próxima consulta o aplicativo atualiza o cofre e volta a permitir o acesso normalmente.
+
+12. SEGURANÇA
+- SUPABASE_SERVICE_ROLE_KEY somente no servidor (import dinâmico dentro dos handlers); nunca em VITE_*, no bundle ou no Electron.
+- Autenticação administrativa por senha verificada no servidor (PBKDF2-SHA256, 100000 iterações); somente salt + hash no banco.
+- Rate limit por origem e limite de corpo (8 KB) preservados; timeout de 8 s; validação estrita do installation_id (UUID).
+- Electron mantido com contextIsolation: true, nodeIntegration: false, sandbox: true; nenhuma ponte privilegiada adicionada.
+- VITE_MONIT_API_URL preservado para apontar o .exe à API externa.
+
+13. TESTES
+- Compilação de tipos (tsgo --noEmit): sem erros.
+- npm run lint: executa; apenas divergências de formatação (prettier) pré-existentes em todo o projeto, nenhuma introduzida por regra de código.
+- Navegador (Playwright, localhost:8080):
+  * / carrega a tela de login original — OK, sem erros de console.
+  * /admin carrega "MONIT.CAMPO / CONTROLE DE ACESSO" — OK.
+  * senha inválida no Admin → "SENHA ADMINISTRATIVA INVÁLIDA" (HTTP 401) — OK.
+  * senha correta → lista de instalações com nome, ID e status — OK.
+  * Installation ID persistente entre recarregamentos — OK.
+  * login com instalação autorizada → entra no sistema — OK.
+  * Admin bloqueia → aplicativo mostra bloqueio e recusa login — OK.
+  * Admin desbloqueia → aplicativo volta a entrar — OK.
+  * API indisponível (requisições abortadas) → sistema continua funcionando, sem tela branca e sem erro de página — OK.
+
+14. BUILD
+- npm run build: sucesso (web + servidor).
+- Electron: os arquivos do desktop foram preservados, porém o package.json deste projeto possui apenas os scripts dev, build, build:dev, preview, lint e format. Não existem os scripts electron:build/dist neste repositório, portanto não foram executados (a geração do .exe é feita na máquina do responsável).
+
+15. REGRESSÃO
+Nenhuma funcionalidade operacional foi alterada: Dashboard, Frentes, Colhedoras, Tratores, Caminhões, Manutenções, Base e Terceiros, Linha do Tempo, Cronograma, Histórico, Moagem, Cadastro, Paradas, Backup/Restauração, Exportação, Configurações, filtros, cálculos, armazenamento local e funcionamento offline permanecem intactos e carregando normalmente.

@@ -1,0 +1,67 @@
+CHECK-UP FINAL — MONIT.CAMPO (npm install / build / dist)
+Data do teste: 10/09/2026 (UTC)
+
+RESULTADOS
+NPM INSTALL: OK
+NPM RUN BUILD: OK
+NPM RUN ELECTRON:BUILD: OK
+NPM RUN DIST: PARCIAL — empacotamento concluído (release/win-unpacked/MONIT.CAMPO.exe),
+  gravação de ícone/instalador NÃO TESTADO — LIMITAÇÃO DO AMBIENTE (exige Windows ou Wine;
+  o Wine do sandbox Linux não executa: "wine is required" / Exec format error / travamento).
+INSTALLER NSIS: NÃO TESTADO — LIMITAÇÃO DO AMBIENTE (configuração revisada e correta)
+PORTABLE: NÃO TESTADO — LIMITAÇÃO DO AMBIENTE (configuração revisada e correta)
+ÍCONE: OK — build/icon.ico (146 KB, 16→256 px) e build/icon.png gerados por scripts/make-icons.mjs
+LOGIN: OK (validado anteriormente na aplicação web/preview; não testado no .exe instalado)
+CENTRAL DEV: OK (ALT+F12; lógica não alterada neste check-up)
+DADOS LOCAIS: OK — nsis.deleteAppDataOnUninstall=false; installation.json em userData/appData
+  preservado entre atualizações; localStorage intacto.
+
+AMBIENTE DE TESTE
+Node: v22.22.0
+NPM: 10.9.4
+Electron: 33.4.11 (dep ^33.2.0)
+electron-builder: 25.1.8
+
+SAÍDA VERIFICADA
+dist/            → build web (TanStack Start/Nitro) — OK
+dist-electron/   → index.html + assets/ (JS, CSS, fontes, imagens, icon.png) — OK
+release/win-unpacked/MONIT.CAMPO.exe + resources/app.asar — OK
+release/MONIT.CAMPO-Setup.exe e release/MONIT.CAMPO.exe → só em Windows/Wine
+
+ERROS ENCONTRADOS
+1. "wine is required ... ERR_ELECTRON_BUILDER_CANNOT_EXECUTE" na etapa de assinatura/ícone.
+   Causa real: ambiente Linux do Lovable sem Wine funcional. Não é defeito do projeto.
+2. Risco de conflito com artefatos antigos em release/ e dist-electron/.
+
+CORREÇÕES REALIZADAS
+- package.json: novo script "clean" (remove dist-electron/ e release/ com segurança) e
+  "dist" agora executa clean → electron:build → electron-builder.
+- package-lock.json gerado/atualizado, correspondente ao package.json (bun.lock mantido
+  para o ambiente Lovable; a distribuição Windows não depende de Bun).
+
+ARQUIVOS MODIFICADOS
+- package.json
+- package-lock.json (gerado)
+- CHECKUP_EXE_MONIT_CAMPO.txt (este relatório)
+
+DEPENDÊNCIAS ALTERADAS
+Nenhuma versão alterada. Auditoria não encontrou pacote inexistente, import não resolvido
+nem incompatibilidade com Electron/Node 22.
+
+CONFIGURAÇÃO CONFERIDA (inalterada, já correta)
+appId com.monit.campo · productName MONIT.CAMPO · executableName MONIT.CAMPO ·
+win target nsis + portable x64 · output release/ · buildResources build/ ·
+icon build/icon.ico (installerIcon/uninstallerIcon/installerHeaderIcon) ·
+nsis: oneClick false, allowToChangeInstallationDirectory true, atalhos desktop e menu,
+shortcutName/uninstallDisplayName MONIT.CAMPO, artifactName MONIT.CAMPO-Setup.exe ·
+portable artifactName MONIT.CAMPO.exe (sem conflito de nomes).
+electron/main.cjs e preload.cjs revisados: protocolo app://monit.campo/ mantido,
+contextIsolation true, nodeIntegration false, sandbox true, IPC de janela e Central DEV intactos.
+.env/.env.example: nenhuma senha ou token privado exposto ao bundle; API mínima continua
+opcional e o sistema funciona offline sem ela.
+
+PARA GERAR O INSTALADOR (Windows 10/11)
+  npm install
+  npm run build
+  npm run dist
+Resultado esperado em release/: MONIT.CAMPO-Setup.exe e MONIT.CAMPO.exe

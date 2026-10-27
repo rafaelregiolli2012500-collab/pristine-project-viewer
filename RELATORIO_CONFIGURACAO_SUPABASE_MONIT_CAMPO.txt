@@ -1,0 +1,195 @@
+================================================================
+RELATORIO DE CONFIGURACAO DO SUPABASE — MONIT.CAMPO
+Autor e criador do sistema: Rafael Regiolli de Souza
+Data: 2026-09-17 (UTC)
+================================================================
+
+1. PROJETO ANALISADO
+--------------------
+Projeto MONIT.CAMPO existente, sem reconstrucao e sem arquitetura
+paralela. Antes de qualquer alteracao foram lidos:
+  - src/lib/access/local.ts   (Installation ID, cofre local, login local)
+  - src/lib/access/remote.ts  (consulta remota)
+  - src/lib/access/protocol.ts(contrato de status)
+  - src/hooks/useAuth.ts      (regra de autorizacao + consulta periodica)
+  - src/components/InstallationGate.tsx, src/pages/Index.tsx
+  - src/integrations/supabase/client.ts
+  - electron/main.cjs, electron/preload.cjs
+  - vite.config.ts, vite.electron.config.ts, package.json, .env.example
+
+2. ARQUITETURA ENCONTRADA (ja vigente antes desta etapa)
+--------------------------------------------------------
+  MONIT.CAMPO.EXE -> Supabase JS -> HTTPS -> RPC
+  public.monit_installation_access -> public.installations
+Sem API intermediaria, sem Netlify, sem Railway, sem WhatsApp, sem
+servidor intermediario, sem Developer Central externa, sem heartbeat
+remoto, sem telemetria, sem WebSocket, sem Supabase Realtime.
+
+3. INTEGRACAO ANTERIOR
+----------------------
+A API antiga (VITE_MONIT_API_URL, src/lib/access/api.ts, rotas
+/api/public/monit/*) ja havia sido removida na etapa anterior.
+Auditoria desta etapa: nenhuma referencia em codigo, configuracao ou
+build. As unicas mencoes a VITE_MONIT_API_URL estao em relatorios
+historicos .txt (documentacao, sem efeito funcional).
+Nenhum fallback para API antiga foi criado.
+
+4. ALTERACOES REALIZADAS (limitadas a configuracao do acesso remoto)
+-------------------------------------------------------------------
+  - .env.production   (novo) URL + Publishable Key oficiais.
+  - .env.development  (novo) mesmas variaveis para desenvolvimento.
+  - .env.example      atualizado: apenas os NOMES das duas variaveis.
+  - env.official.mjs / env.official.d.mts (novos): origem unica que
+    aplica as variaveis oficiais ao ambiente de build, garantindo que
+    web e .exe apontem para o Supabase oficial mesmo quando a maquina
+    de build tiver variaveis herdadas do ambiente.
+  - vite.config.ts / vite.electron.config.ts: chamam essa funcao;
+    o build Electron passou a ler as variaveis da raiz do projeto
+    (envDir), nao da pasta desktop.
+Nenhuma alteracao em Installation ID, login local, cofre local, regra
+de autorizacao, consulta periodica ou modulos operacionais.
+
+5. NOVO SUPABASE CONFIGURADO
+----------------------------
+URL utilizada: https://bhymidkpthyuojqcflzp.supabase.co
+Chave usada no cliente: somente a Publishable Key (sb_publishable_...).
+Nao existe service_role, sb_secret, senha do banco ou token
+administrativo no codigo, no bundle, no preload, no main ou no .exe.
+Verificacao no bundle desktop:
+  - VITE_SUPABASE_URL = https://bhymidkpthyuojqcflzp.supabase.co  OK
+  - VITE_SUPABASE_PUBLISHABLE_KEY = sb_publishable_...            OK
+  - referencia ao projeto anterior: NENHUMA                        OK
+  - "sb_secret"/"service_role": apenas trechos internos da
+    biblioteca @supabase/supabase-js, sem nenhum valor de chave.    OK
+
+6. VARIAVEIS DE AMBIENTE
+------------------------
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+(VITE_SUPABASE_PROJECT_ID mantido apenas como identificacao tecnica.)
+Nenhuma variavel para secret/service_role foi criada.
+.env.example documenta somente nomes, sem valores.
+
+7. TABELA public.installations
+------------------------------
+id uuid pk default gen_random_uuid()
+installation_id text not null unique
+name text not null
+status text not null default 'pendente'
+created_at timestamptz not null default now()
+updated_at timestamptz not null default now()
+Status validos: pendente | autorizada | bloqueada.
+
+8. RPC
+------
+public.monit_installation_access(p_installation_id, p_name)
+Retorna somente name e status da propria instalacao consultada.
+O aplicativo consulta exclusivamente por essa RPC
+(src/lib/access/remote.ts — unica chamada de rede do controle remoto).
+
+9. RLS / SEGURANCA
+------------------
+Testado diretamente contra o novo projeto com a Publishable Key:
+  RPC   monit_installation_access ......... 200 (funciona)
+  SELECT direto em installations .......... 401 permission denied
+  INSERT direto ........................... 401 permission denied
+  UPDATE direto ........................... 401 permission denied
+  DELETE direto ........................... 401 permission denied
+O cliente nao le nem altera a tabela; nao recebe outras instalacoes,
+dados administrativos, credenciais ou informacoes internas.
+
+10. REGRA PENDENTE / AUTORIZADA / BLOQUEADA
+-------------------------------------------
+autorizada -> permite entrar   |   pendente -> nega   |   bloqueada -> nega
+Pendente nunca e interpretado como autorizado.
+
+11. COMPORTAMENTO OFFLINE
+-------------------------
+Falha de comunicacao (offline, DNS, timeout 8s, conexao recusada,
+400/401/403/408/429/500/502/503, resposta invalida) e tratada como
+"sem comunicacao" e NUNCA como bloqueio. Vale o ultimo estado valido
+guardado no cofre local criptografado. Sem nenhum estado valido
+conhecido, o acesso permanece negado.
+
+12. CONSULTA PERIODICA
+----------------------
+Uma unica rotina, em src/hooks/useAuth.ts, com um unico setInterval de
+10 minutos, atualizando somente o estado de autorizacao. Sem polling
+duplicado, sem heartbeat remoto, sem timers concorrentes.
+
+13. LOGIN LOCAL
+---------------
+Preservado integralmente: 1) autorizacao remota -> 2) se autorizada ->
+3) login local (PBKDF2, senha nunca sai do computador) -> 4) operacao.
+Nenhum usuario, senha ou ADMIN foi criado, removido ou alterado.
+
+14. INSTALLATION ID
+-------------------
+Mecanismo unico e inalterado (src/lib/access/local.ts), UUID gerado uma
+unica vez, persistente em armazenamento local, fora do backup
+operacional. Teste real: fechar/reabrir manteve o mesmo identificador
+85e1ff24-... Nao existe outro gerador de Installation ID no projeto.
+
+15. ELECTRON
+------------
+electron/main.cjs mantem contextIsolation: true, nodeIntegration: false,
+sandbox: true, webSecurity: true. Nenhum secret em main.cjs, preload.cjs,
+renderer ou bundle.
+
+16. TESTES REALIZADOS
+---------------------
+[OK] Instalacao nova: Installation ID inexistente -> RPC registrou como
+     pendente -> acesso negado com a mensagem ao administrador.
+[OK] Autorizada -> tela de login local liberada.
+[OK] Bloqueada -> acesso negado.
+[OK] Bloqueada -> autorizada -> acesso liberado na nova consulta.
+[OK] Offline com ultimo estado autorizada -> aplicativo continua
+     funcionando (conexao recusada nao virou bloqueio).
+[OK] Persistencia do Installation ID apos reabrir.
+[OK] Seguranca: SELECT/INSERT/UPDATE/DELETE diretos negados.
+[OK] Rede observada na execucao real: unica chamada e a RPC do novo
+     projeto; nenhum outro endpoint, nenhuma telemetria.
+[OK] Somente uma implementacao de Installation ID, de controle remoto
+     e de consulta de autorizacao.
+[OK] npm run build (web) e npm run build:electron concluidos.
+[OK] Verificacao de tipos sem erros.
+
+17. BUILD
+---------
+npm install ......... dependencias ja instaladas no projeto.
+npm run build ....... OK
+npm run build:electron OK
+npm run lint ........ acusa ~2.8 mil apontamentos de FORMATACAO
+                      (prettier: aspas simples/duplas) pre-existentes em
+                      todo o projeto, anteriores a esta etapa e sem
+                      relacao com o controle de acesso. Nenhum erro
+                      logico. Nao foram mascarados nem reformatados em
+                      massa para nao tocar modulos operacionais.
+npm run dist (instalador Windows): NAO executado aqui.
+  Codigo validado. Build Windows depende de ambiente Windows.
+
+18. NAO ALTERADO
+----------------
+Dashboard, Frentes, Colhedoras, Tratores, Caminhoes, Manutencoes, Base e
+Terceiros, Linha do Tempo, Cronograma, Historico, Moagem, Cadastro,
+Paradas, Parada Climatica, Backup, Restauracao, Exportacoes,
+Configuracoes, Trajetos, Visao para Print e demais funcionalidades.
+
+19. TELEMETRIA
+--------------
+Nada operacional trafega: nenhum operador, matricula, frota, producao,
+moagem, manutencao, historico, cliente, localizacao, screenshot ou
+conteudo de backup. Ao Supabase vao somente Installation ID, nome da
+instalacao e retornam nome e status.
+
+20. PENDENCIAS
+--------------
+1) Instalador Windows (.exe): precisa ser gerado em maquina Windows com
+   "npm run dist". O projeto esta preparado.
+2) Autorizacao real desta instalacao de teste no novo projeto: o
+   administrador precisa alterar manualmente o status de "pendente"
+   para "autorizada" no Supabase. O aplicativo nao possui — e nao deve
+   possuir — credencial privilegiada para isso.
+
+Nenhuma secret key, senha de banco ou service_role consta neste relatorio.
+================================================================
