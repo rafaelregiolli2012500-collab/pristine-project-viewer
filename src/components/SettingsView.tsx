@@ -159,9 +159,7 @@ export function SettingsView({ onExport, onImport, records = [], onLogout }: Pro
   };
 
   const openAdmin = () => {
-    if (typeof window !== 'undefined' && window.monitCampo?.openAdminPanel) {
-      window.monitCampo.openAdminPanel();
-    }
+    openAdminPanel();
   };
 
   return (
