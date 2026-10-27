@@ -240,15 +240,17 @@ const Index = () => {
     setInstallationName(getActiveUnit().name);
   }, [authenticated]);
 
-  /* 1) Autorização da instalação. Só depois vem o login operacional. */
+  /* 1) Autorização da instalação. Só depois vem o login operacional.
+     Enquanto verifica, mostra a tela de verificação. Quando a instalação
+     NÃO está autorizada, a tela de entrada continua visível com o aviso —
+     e o escudo de acesso administrativo (canto superior esquerdo) segue
+     acessível. O login operacional permanece bloqueado até a autorização. */
+  if (access === 'verificando') {
+    return <InstallationGate message="" verificando online={online} />;
+  }
+
   if (access !== 'permitido') {
-    return (
-      <InstallationGate
-        message={accessMessage ?? ''}
-        verificando={access === 'verificando'}
-        online={online}
-      />
-    );
+    return <LoginScreen onLogin={login} aviso={accessMessage} />;
   }
 
   if (!authenticated) {

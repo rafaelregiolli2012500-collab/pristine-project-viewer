@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock, Wrench, Shield } from 'lucide-react';
 import coaHero from '@/assets/coa-hero.jpg';
+import { openAdminPanel } from '@/lib/adminPanel';
 
 import type { LoginResult } from '@/hooks/useAuth';
 
@@ -46,9 +47,7 @@ export function LoginScreen({ onLogin, aviso }: Props) {
   };
 
   const openAdmin = () => {
-    if (typeof window !== 'undefined' && window.monitCampo?.openAdminPanel) {
-      window.monitCampo.openAdminPanel();
-    }
+    openAdminPanel();
   };
 
   return (

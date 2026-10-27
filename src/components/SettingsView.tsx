@@ -13,6 +13,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { openAdminPanel } from '@/lib/adminPanel';
 import type { EquipmentType } from '@/types/maintenance';
 import { downloadMaintenanceExcel, EQUIPMENT_LABELS } from '@/lib/excelExport';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -159,9 +160,7 @@ export function SettingsView({ onExport, onImport, records = [], onLogout }: Pro
   };
 
   const openAdmin = () => {
-    if (typeof window !== 'undefined' && window.monitCampo?.openAdminPanel) {
-      window.monitCampo.openAdminPanel();
-    }
+    openAdminPanel();
   };
 
   return (
