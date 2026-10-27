@@ -166,22 +166,6 @@ export function SettingsView({ onExport, onImport, records = [], onLogout }: Pro
   return (
     <div className="space-y-4">
 
-      {/* Acesso administrativo — Painel Central (online) */}
-      <Card className="border-primary/20">
-        <CardHeader className="py-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Shield className="h-4 w-4" /> Acesso administrativo
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-4 pt-0">
-          <p className="text-xs text-muted-foreground">
-            Abre o Painel Central em janela separada. Login e permissões são os do painel original.
-          </p>
-          <Button type="button" variant="outline" size="sm" className="gap-2 shrink-0" onClick={openAdmin}>
-            <Shield className="h-4 w-4" /> Abrir Central
-          </Button>
-        </CardContent>
-      </Card>
 
       {/* TRAVAR CRONOGRAMA */}
       <Card>
@@ -413,6 +397,19 @@ export function SettingsView({ onExport, onImport, records = [], onLogout }: Pro
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Acesso administrativo — Painel Central: somente o ícone, no rodapé da aba */}
+      <div className="flex justify-end pt-1">
+        <button
+          type="button"
+          onClick={openAdmin}
+          title="Acesso administrativo"
+          aria-label="Acesso administrativo"
+          className="p-2 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Shield className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
