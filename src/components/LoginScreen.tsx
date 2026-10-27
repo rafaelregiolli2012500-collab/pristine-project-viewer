@@ -47,9 +47,7 @@ export function LoginScreen({ onLogin, aviso }: Props) {
   };
 
   const openAdmin = () => {
-    if (typeof window !== 'undefined' && window.monitCampo?.openAdminPanel) {
-      window.monitCampo.openAdminPanel();
-    }
+    openAdminPanel();
   };
 
   return (
