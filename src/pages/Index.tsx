@@ -58,7 +58,7 @@ const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: 
   {
     title: 'Gestão',
     items: [
-      { value: 'cronograma', label: 'Cronograma', icon: BarChart3 },
+      { value: 'cronograma', label: 'Análise Paradas', icon: BarChart3 },
       { value: 'linha-tempo', label: 'Linha do Tempo', icon: Activity },
       { value: 'trajetos', label: 'Trajetos', icon: Route },
       { value: 'print', label: 'Visão para Print', icon: Camera },
@@ -431,7 +431,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="cronograma" className="mt-0">
-            <Panel title="Cronogramas" icon={<BarChart3 className="size-4 text-primary" />}>
+            <Panel title="Análise Paradas" icon={<BarChart3 className="size-4 text-primary" />}>
               <TimelineChart
                 records={cronogramaRecords}
                 equipment={equipment}

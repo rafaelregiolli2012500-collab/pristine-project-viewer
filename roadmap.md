@@ -1,5 +1,7 @@
 # Roadmap — MONIT.CAMPO
 
+- [x] Aplicar ZIP Análise Paradas: nomes, captura completa, modo horário de caminhões e backup de todas as unidades; acesso preservado; 49 testes aprovados e backup conferido no navegador. Conferência visual da análise/cópia aguarda autorização da instalação.
+
 - [ ] Dashboard logístico de caminhões na Linha do Tempo → Gráficos: mesma base, importação por cabeçalho, cálculos com lacunas, filtros, gráficos e tabelas paginadas; testes e relatório. Base original de 94.216 apontamentos e imagem de referência não foram anexadas.
 
 - [x] Separar as linhas de paradas de colhedoras e tratores por cor e frente somente na comparação somada, preservando os gráficos individuais — 4 testes aprovados e build OK; conferência visual do gráfico bloqueada pela autorização da instalação.

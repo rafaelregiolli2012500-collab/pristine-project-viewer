@@ -1037,7 +1037,7 @@ export function LinhaDoTempo({ records = [], onAddToHistory }: {
   return (
     <Tabs value={innerTab} onValueChange={(v) => { setInnerTab(v); try { localStorage.setItem('ldt_inner_tab', v); } catch {/* ignore */} }} className="space-y-3">
       <TabsList>
-        <TabsTrigger value="cronograma" className="gap-1 text-xs"><BarChart3 className="h-3 w-3" /> Cronograma</TabsTrigger>
+        <TabsTrigger value="cronograma" className="gap-1 text-xs"><BarChart3 className="h-3 w-3" /> Análise Paradas</TabsTrigger>
         <TabsTrigger value="grafico" className="gap-1 text-xs"><BarChart3 className="h-3 w-3" /> Gráfico</TabsTrigger>
         <TabsTrigger value="planilha" className="gap-1 text-xs"><FileSpreadsheet className="h-3 w-3" /> Importar Bases</TabsTrigger>
       </TabsList>
@@ -1103,7 +1103,7 @@ export function LinhaDoTempo({ records = [], onAddToHistory }: {
             <h2 className="text-base font-bold uppercase text-foreground">Linha do Tempo</h2>
             <p className="text-xs text-muted-foreground">Visão operacional por frota e período</p>
           </div>
-          <div role="group" aria-label="Seletor do cronograma" className="grid w-full grid-cols-2 gap-1 rounded-md border border-border bg-muted/40 p-1 sm:w-fit sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none">
+          <div role="group" aria-label="Seletor da análise de paradas" className="grid w-full grid-cols-2 gap-1 rounded-md border border-border bg-muted/40 p-1 sm:w-fit sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none">
             {availableSelectors.map(sel => (
               <Button
                 key={sel}
