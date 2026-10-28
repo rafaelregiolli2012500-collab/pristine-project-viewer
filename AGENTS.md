@@ -14,3 +14,4 @@
 - Assemble front comparison series in the browser-safe timelineFrontComparison helper from existing official summaries; this separates equipment stop lines without duplicating clipping or duration calculations.
 - Front-level analyses (stop counts, no-maintenance windows, maintenance rankings) live in the pure helper src/lib/timelineFrontAnalysis.ts, fed by the official clipped segments; why: one calculation source, no base mutation, testable.
 - Truck telemetry uses the existing canavieiros raw base and one worker parser/shared observation-pair helper in truckTimeline; why: point telemetry needs gap-aware intervals and original counts that aggregated front segments cannot recover, while other equipment pipelines remain unchanged.
+- Integral backups use native storage operations retained by the unit scope and an explicit all-units marker; why: export, restore, validation and rollback must preserve unit prefixes while legacy backups remain scoped.

@@ -77,6 +77,13 @@ export function isHourMode(): boolean {
 
 let installed = false;
 
+/** Native storage operations retained before the unit scope overrides them. */
+let nativeStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'> | undefined;
+
+export function getUnscopedStorage() {
+  return nativeStorage ?? window.localStorage;
+}
+
 /**
  * Instala o escopo de armazenamento por unidade.
  * Deve rodar ANTES de qualquer módulo da aplicação ler o localStorage.
@@ -91,6 +98,14 @@ export function installUnitStorageScope() {
   const rawRemove = proto.removeItem;
   const rawKey = proto.key;
   const rawLengthDesc = Object.getOwnPropertyDescriptor(proto, 'length');
+
+  nativeStorage = {
+    getItem: key => rawGet.call(window.localStorage, key),
+    setItem: (key, value) => rawSet.call(window.localStorage, key, value),
+    removeItem: key => rawRemove.call(window.localStorage, key),
+    key: index => rawKey.call(window.localStorage, index),
+    get length() { return rawLengthDesc?.get?.call(window.localStorage) ?? 0; },
+  };
 
   // Lê a unidade persistida com o método original (chave global).
   try {

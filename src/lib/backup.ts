@@ -18,7 +18,7 @@
  *  - Compatibilidade com backups de versões anteriores (aliases legados).
  */
 
-import { getActiveUnit, getUnitById, UNITS } from './units';
+import { getActiveUnit, getUnitById, getUnscopedStorage, UNITS } from './units';
 
 export const BACKUP_VERSION = 3;
 /** Versão do aplicativo — injetada no build; apenas informativa no backup. */
@@ -48,7 +48,8 @@ const AUTH_PREFIX = 'monit.campo/CHAVE';
 
 /** Verdadeiro para chaves que não pertencem aos dados operacionais. */
 function isProtectedKey(key: string): boolean {
-  return VOLATILE_KEYS.has(key) || key.startsWith(AUTH_PREFIX);
+  const logicalKey = key.replace(/^unit:[^:]+:/, '');
+  return VOLATILE_KEYS.has(logicalKey) || logicalKey.startsWith(AUTH_PREFIX);
 }
 
 /** Chaves críticas — validadas na exportação e na importação. */
@@ -86,6 +87,8 @@ export interface BackupMeta {
 export interface BackupFile {
   __backup: true;
   version: number;
+  /** New backups use native keys for every unit; older files remain scoped. */
+  storageScope?: 'all-units';
   exportDate: string;
   meta: BackupMeta;
   /** Snapshot integral: chave -> valor bruto (string) do localStorage */
@@ -129,13 +132,14 @@ function newId() {
   }
 }
 
-/** Lê todo o armazenamento local relevante. */
+/** Lê todas as unidades com chaves nativas, sem duplicar ou perder prefixos. */
 export function snapshotStorage(): Record<string, string> {
   const out: Record<string, string> = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
+  const storage = getUnscopedStorage();
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
     if (!key || isProtectedKey(key)) continue;
-    const value = localStorage.getItem(key);
+    const value = storage.getItem(key);
     if (value != null) out[key] = value;
   }
   return out;
@@ -153,6 +157,7 @@ export function buildBackup(): BackupFile {
   return {
     __backup: true,
     version: BACKUP_VERSION,
+    storageScope: 'all-units',
     exportDate: now.toISOString(),
     meta: {
       app: APP_NAME,
@@ -169,7 +174,7 @@ export function buildBackup(): BackupFile {
       unidade: getActiveUnit().name,
     },
     storage,
-    records: safeParse(storage['maintenance_records'] ?? null) ?? [],
+    records: safeParse(storage[`${getActiveUnit().prefix}maintenance_records`] ?? null) ?? [],
     counts,
   };
 }
@@ -343,7 +348,8 @@ function normalizeBackup(data: any): Record<string, string> {
   // Formato legado: chaves soltas na raiz do JSON
   if (data && typeof data === 'object') {
     Object.entries(data).forEach(([k, v]) => {
-      if (['storage', '__backup', 'version', 'exportDate', 'counts', 'meta'].includes(k)) return;
+      if (['storage', '__backup', 'version', 'storageScope', 'exportDate', 'counts', 'meta'].includes(k)) return;
+      if (data.storageScope === 'all-units' && k === 'records') return;
       if (k === 'records') { if (map['maintenance_records'] == null) put('maintenance_records', v); return; }
       const target = LEGACY_ALIASES[k] ?? k;
       if (map[target] == null) put(target, v);
@@ -355,17 +361,18 @@ function normalizeBackup(data: any): Record<string, string> {
 }
 
 /** Restaura integralmente um mapa de chaves, removendo o que não pertence ao backup. */
-function writeStorage(map: Record<string, string>) {
+function writeStorage(map: Record<string, string>, allUnits = false) {
+  const storage = allUnits ? getUnscopedStorage() : localStorage;
   const keep = new Set(Object.keys(map));
   const existing: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
+  for (let i = 0; i < storage.length; i++) {
+    const k = storage.key(i);
     if (k) existing.push(k);
   }
   existing.forEach(k => {
-    if (!keep.has(k) && !isProtectedKey(k)) localStorage.removeItem(k);
+    if (!keep.has(k) && !isProtectedKey(k)) storage.removeItem(k);
   });
-  Object.entries(map).forEach(([k, v]) => localStorage.setItem(k, v));
+  Object.entries(map).forEach(([k, v]) => storage.setItem(k, v));
 }
 
 /**
@@ -386,11 +393,12 @@ export function applyBackup(raw: string, options: { safetyBackup?: boolean } = {
 
   // ---- VALIDAÇÃO DE UNIDADE (antes de qualquer alteração nos dados) ----
   const atual = getActiveUnit();
+  const allUnits = data?.storageScope === 'all-units';
   const backupUnitId: string | undefined = data?.meta?.unidadeId ?? data?.unidadeId;
   const backupUnitNome: string | undefined =
     data?.meta?.unidade ?? (backupUnitId ? getUnitById(backupUnitId).name : undefined);
   // Backups antigos (sem identificação) pertencem à unidade base — Vale do Paraná.
-  const resolvedUnitId = backupUnitId && UNITS.some(u => u.id === backupUnitId) ? backupUnitId : (backupUnitId ? backupUnitId : UNITS[0]!.id);
+  const resolvedUnitId = backupUnitId && UNITS.some(u => u.id === backupUnitId) ? backupUnitId : (backupUnitId ?? UNITS[0]?.id);
   if (resolvedUnitId !== atual.id) {
     return fail([
       'BACKUP INCOMPATÍVEL.',
@@ -431,13 +439,13 @@ export function applyBackup(raw: string, options: { safetyBackup?: boolean } = {
   }
 
   const restoreRollback = () => {
-    try { writeStorage(rollback); } catch { /* noop */ }
+    try { writeStorage(rollback, true); } catch { /* noop */ }
     try { window.dispatchEvent(new CustomEvent(BACKUP_RESTORED_EVENT)); } catch { /* noop */ }
   };
 
   const restoredKeys: string[] = Object.keys(map);
   try {
-    writeStorage(map);
+    writeStorage(map, allUnits);
   } catch {
     restoreRollback();
     return fail(
@@ -448,7 +456,7 @@ export function applyBackup(raw: string, options: { safetyBackup?: boolean } = {
 
   // ---- VALIDAÇÃO PÓS-IMPORTAÇÃO (fidelidade byte a byte) ----
   const mismatched = Object.entries(map)
-    .filter(([k, v]) => localStorage.getItem(k) !== v)
+    .filter(([k, v]) => (allUnits ? getUnscopedStorage() : localStorage).getItem(k) !== v)
     .map(([k]) => k);
   if (mismatched.length > 0) {
     restoreRollback();
@@ -468,17 +476,18 @@ export function applyBackup(raw: string, options: { safetyBackup?: boolean } = {
   const equipamentos = safeParse<any[]>(localStorage.getItem('equipment_registry')) ?? [];
   const manutencoes = safeParse<any[]>(localStorage.getItem('maintenance_records')) ?? [];
 
-  const expectedFrentes = safeParse<any[]>(map['frente_configs'] ?? null);
-  const expectedEquip = safeParse<any[]>(map['equipment_registry'] ?? null);
-  const expectedRec = safeParse<any[]>(map['maintenance_records'] ?? null);
+  const prefix = allUnits ? atual.prefix : '';
+  const expectedFrentes = safeParse<any[]>(map[`${prefix}frente_configs`] ?? null);
+  const expectedEquip = safeParse<any[]>(map[`${prefix}equipment_registry`] ?? null);
+  const expectedRec = safeParse<any[]>(map[`${prefix}maintenance_records`] ?? null);
 
-  if (map['frente_configs'] == null) {
+  if (map[`${prefix}frente_configs`] == null) {
     issues.push('O backup não continha a Tabela de Frentes de Colheita.');
   } else if (!Array.isArray(frentes) || (Array.isArray(expectedFrentes) && frentes.length !== expectedFrentes.length)) {
     issues.push('Frentes de colheita: quantidade restaurada diferente da esperada.');
   }
 
-  if (map['equipment_registry'] == null) {
+  if (map[`${prefix}equipment_registry`] == null) {
     issues.push('O backup não continha o cadastro de equipamentos.');
   } else if (Array.isArray(expectedEquip) && equipamentos.length !== expectedEquip.length) {
     issues.push('Equipamentos: quantidade restaurada diferente da esperada.');
