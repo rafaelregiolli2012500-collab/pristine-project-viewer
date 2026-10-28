@@ -24,3 +24,4 @@
 - [ ] Validar gravação real no Histórico e Electron — instalação da prévia pendente de autorização; ambiente Windows indisponível
 
 - [x] Linha do Tempo: base Canavieiros, 4 seletores dinâmicos, visão consolidada de efetividade por frente, Frente dos tratores pelo Grupo Equipamento, gráficos por seletor
+- [x] Acesso administrativo só como ícone discreto no rodapé da aba Config (card do topo removido) — Central abre em nova aba; verificado na prévia.
