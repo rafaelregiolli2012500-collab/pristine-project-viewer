@@ -2,9 +2,9 @@
   {
     "capability": "code",
     "source": "Five incremental source files",
-    "outcome": "Apply uploaded changes while retaining prior edits",
-    "status": "pending",
-    "next_action": "Apply and test"
+    "outcome": "Five source updates applied; native storage correction keeps all-unit backup export and restore safe",
+    "status": "applied",
+    "next_action": null
   },
   {
     "capability": "schema",
@@ -93,8 +93,8 @@
   {
     "capability": "verification",
     "source": "Targeted tests and browser checks",
-    "outcome": "Pending",
-    "status": "pending",
-    "next_action": "Apply and test"
+    "outcome": "49 tests passed; build OK; browser backup includes both units; no runtime errors",
+    "status": "partially-verified",
+    "next_action": "Authorized installation required to verify analysis capture and truck filters through UI; Windows required for Electron verification"
   }
 ]
