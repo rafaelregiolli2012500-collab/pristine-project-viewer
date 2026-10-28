@@ -1,0 +1,100 @@
+[
+  {
+    "capability": "code",
+    "source": "Five incremental source files",
+    "outcome": "Apply uploaded changes while retaining prior edits",
+    "status": "pending",
+    "next_action": "Apply and test"
+  },
+  {
+    "capability": "schema",
+    "source": "No schema changes supplied",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "records",
+    "source": "No record exports; existing local operational data",
+    "outcome": "Preserve existing data",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "auth identities",
+    "source": "Existing installation access untouched",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "authorization",
+    "source": "Existing access boundaries untouched",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "uploaded file bytes",
+    "source": "No media supplied",
+    "outcome": "Not applicable",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "external providers",
+    "source": "No provider changes supplied",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "public endpoints",
+    "source": "No endpoints changed",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "callbacks",
+    "source": "No callbacks changed",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "webhooks",
+    "source": "No webhooks changed",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "schedules",
+    "source": "No schedules changed",
+    "outcome": "Not changed",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "secrets",
+    "source": "No variables required",
+    "outcome": "Not applicable",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "cutover",
+    "source": "Incremental preview update, no deployment requested",
+    "outcome": "Not applicable",
+    "status": "unchanged",
+    "next_action": null
+  },
+  {
+    "capability": "verification",
+    "source": "Targeted tests and browser checks",
+    "outcome": "Pending",
+    "status": "pending",
+    "next_action": "Apply and test"
+  }
+]
