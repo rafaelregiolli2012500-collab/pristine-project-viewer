@@ -15,3 +15,5 @@
 - Front-level analyses (stop counts, no-maintenance windows, maintenance rankings) live in the pure helper src/lib/timelineFrontAnalysis.ts, fed by the official clipped segments; why: one calculation source, no base mutation, testable.
 - Truck telemetry uses the existing canavieiros raw base and one worker parser/shared observation-pair helper in truckTimeline; why: point telemetry needs gap-aware intervals and original counts that aggregated front segments cannot recover, while other equipment pipelines remain unchanged.
 - Integral backups use native storage operations retained by the unit scope and an explicit all-units marker; why: export, restore, validation and rollback must preserve unit prefixes while legacy backups remain scoped.
+- Report image copying uses the browser-only reportCapture helper to capture an isolated full-width clone; why: viewport size and surrounding controls must not crop or pollute the report.
+- All-harvester markers use timelineFrontAnalysis with official clipped production segments and the full registered front inventory passed into LinhaDoTempo; why: missing fleet coverage cannot imply simultaneous operation.
