@@ -14,6 +14,12 @@ export async function captureReport(element: HTMLElement, minimumWidth: number):
   clone.style.height = 'auto';
   clone.style.maxHeight = 'none';
   clone.style.overflow = 'visible';
+  // Lazy paint containment reports a placeholder height for off-screen grids.
+  // Disable it before measuring both the source clone and html2canvas's clone.
+  for (const node of [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))]) {
+    node.style.setProperty('content-visibility', 'visible', 'important');
+    node.style.setProperty('contain', 'none', 'important');
+  }
   host.appendChild(clone);
   document.body.appendChild(host);
   try {
