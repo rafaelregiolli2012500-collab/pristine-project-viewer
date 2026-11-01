@@ -3,7 +3,7 @@
  * Autor e criador: Rafael Regiolli de Souza
  */
 import { useRef, useState, type CSSProperties } from 'react';
-import html2canvas from 'html2canvas';
+import { copyReport } from '@/lib/reportCapture';
 import { toast } from 'sonner';
 import { MaintenanceRecord, FrenteConfig, StopReason, STOP_REASON_LABELS, STOP_REASON_SHORT_LABELS, STOP_REASON_COLORS, Equipment } from '@/types/maintenance';
 import { contrastTextColor, subtleBorderForBackground } from '@/lib/statusColor';
@@ -50,87 +50,8 @@ export function PrintView({ records, frentes, equipment = [], onAdd }: Props) {
     if (!captureRef.current) return;
     setCopying(true);
     try {
-      const el = captureRef.current;
-      await document.fonts?.ready;
-
-      // Freeze the geometry that is already rendered on screen. html2canvas creates
-      // its own document; without these measurements the cloned tables can run a
-      // second layout pass with different column widths.
-      const panelRect = el.getBoundingClientRect();
-      const panelWidth = Math.ceil(panelRect.width);
-      const panelHeight = Math.ceil(el.scrollHeight);
-      const measuredTables = Array.from(el.querySelectorAll('table')).map(table => ({
-        width: table.getBoundingClientRect().width,
-        rows: Array.from(table.rows).map(row => ({
-          height: row.getBoundingClientRect().height,
-          cells: Array.from(row.cells).map(cell => cell.getBoundingClientRect().width),
-        })),
-      }));
-
-      const canvas = await html2canvas(el, {
-        backgroundColor: '#ffffff',
-        scale: Math.max(2, Math.min(window.devicePixelRatio || 1, 3)),
-        useCORS: true,
-        width: panelWidth,
-        height: panelHeight,
-        windowWidth: document.documentElement.clientWidth,
-        windowHeight: document.documentElement.clientHeight,
-        scrollX: -window.scrollX,
-        scrollY: -window.scrollY,
-        onclone: clonedDocument => {
-          const clone = clonedDocument.querySelector<HTMLElement>('[data-print-panel]');
-          if (!clone) return;
-
-          clone.dataset.printMode = 'true';
-          clone.style.setProperty('width', `${panelWidth}px`, 'important');
-          clone.style.setProperty('min-width', `${panelWidth}px`, 'important');
-          clone.style.setProperty('max-width', `${panelWidth}px`, 'important');
-          clone.style.setProperty('height', `${panelHeight}px`, 'important');
-          clone.style.setProperty('box-sizing', 'border-box', 'important');
-
-          Array.from(clone.querySelectorAll('table')).forEach((table, tableIndex) => {
-            const measurement = measuredTables[tableIndex];
-            if (!measurement) return;
-
-            const tableElement = table as HTMLElement;
-            tableElement.style.setProperty('width', `${measurement.width}px`, 'important');
-            tableElement.style.setProperty('min-width', `${measurement.width}px`, 'important');
-            tableElement.style.setProperty('max-width', `${measurement.width}px`, 'important');
-            tableElement.style.setProperty('table-layout', 'fixed', 'important');
-
-            Array.from(table.rows).forEach((row, rowIndex) => {
-              const rowMeasurement = measurement.rows[rowIndex];
-              if (!rowMeasurement) return;
-              row.style.setProperty('height', `${rowMeasurement.height}px`, 'important');
-
-              Array.from(row.cells).forEach((cell, cellIndex) => {
-                const cellWidth = rowMeasurement.cells[cellIndex];
-                if (!cellWidth) return;
-                cell.style.setProperty('width', `${cellWidth}px`, 'important');
-                cell.style.setProperty('min-width', `${cellWidth}px`, 'important');
-                cell.style.setProperty('max-width', `${cellWidth}px`, 'important');
-                cell.style.setProperty('box-sizing', 'border-box', 'important');
-                cell.style.setProperty('vertical-align', 'middle', 'important');
-              });
-            });
-          });
-        },
-      });
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Falha ao gerar a imagem')), 'image/png');
-      });
-      try {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        toast.success('Print copiado!');
-      } catch {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `print-manutencao-${new Date().toISOString().slice(0, 10)}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Print baixado!');
-      }
+      const result = await copyReport(captureRef.current, 1180, `print-manutencao-${new Date().toISOString().slice(0, 10)}.png`);
+      toast.success(result === 'copied' ? 'Print copiado!' : 'Print baixado!');
     } catch (e) {
       console.error(e);
       toast.error('Erro ao copiar print');
@@ -240,7 +161,7 @@ export function PrintView({ records, frentes, equipment = [], onAdd }: Props) {
             <AddMaintenanceDialog equipmentType="colhedora" autoDetectType onAdd={onAdd} registeredEquipment={equipment} frentes={frentes} />
           )}
         </div>
-        <Button size="sm" variant="outline" onClick={handleCopy} className="gap-1">
+        <Button size="sm" variant="outline" onClick={handleCopy} disabled={copying} className="gap-1">
           <Copy className="w-3.5 h-3.5" />
           {copying ? 'Copiando...' : 'Copiar Print'}
         </Button>
