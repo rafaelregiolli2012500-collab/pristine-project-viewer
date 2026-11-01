@@ -1,5 +1,9 @@
 # Roadmap — MONIT.CAMPO
 
+- [x] Corrigir Copiar Análise e Copiar Print: imagens completas conferidas isoladamente em 1280 e 491 px, inclusive últimas linhas e totais; navegação e controles excluídos.
+- [x] Marcar no gráfico exclusivo de colhedoras os períodos e o tempo total com todas as colhedoras cadastradas da frente em produção; testes de lacunas, recortes, total e exclusividade aprovados.
+- [ ] Conferir essas alterações pelo fluxo normal com dados reais — instalação da prévia ainda não autorizada; conferência isolada não substitui o acesso real.
+
 - [x] Aplicar ZIP Análise Paradas: nomes, captura completa, modo horário de caminhões e backup de todas as unidades; acesso preservado; 49 testes aprovados e backup conferido no navegador. Conferência visual da análise/cópia aguarda autorização da instalação.
 
 - [ ] Dashboard logístico de caminhões na Linha do Tempo → Gráficos: mesma base, importação por cabeçalho, cálculos com lacunas, filtros, gráficos e tabelas paginadas; testes e relatório. Base original de 94.216 apontamentos e imagem de referência não foram anexadas.

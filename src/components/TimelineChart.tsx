@@ -16,7 +16,7 @@ import {
 } from '@/types/maintenance';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import html2canvas from 'html2canvas-pro';
+import { copyReport } from '@/lib/reportCapture';
 import { Copy, Settings as SettingsIcon, Lock, Pencil, X } from 'lucide-react';
 import { useSystemTime } from '@/hooks/useSystemTime';
 import { toast } from 'sonner';
@@ -930,62 +930,13 @@ export function TimelineChart({
   ) => {
     if (!ref.current) return;
     setCopyingTab(tabKey);
-    const el = ref.current;
-    // Guarda estilos que podem cortar as últimas linhas na captura
-    const prev = {
-      overflow: el.style.overflow,
-      overflowY: el.style.overflowY,
-      maxHeight: el.style.maxHeight,
-      height: el.style.height,
-    };
-    // Expande temporariamente para capturar o conteúdo completo (inclui últimas linhas)
-    const fullH = Math.max(el.scrollHeight, el.offsetHeight);
-    const fullW = Math.max(el.scrollWidth, el.offsetWidth);
-    el.style.overflow = 'visible';
-    el.style.overflowY = 'visible';
-    el.style.maxHeight = 'none';
-    el.style.height = `${fullH}px`;
     try {
-      const canvas = await html2canvas(el, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        width: fullW,
-        height: fullH,
-        windowWidth: fullW,
-        windowHeight: fullH,
-        scrollX: 0,
-        scrollY: 0,
-      });
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), 'image/png')
-      );
-      if (!blob) throw new Error('Falha ao gerar imagem');
-      try {
-        // @ts-ignore
-        await navigator.clipboard.write([
-          // @ts-ignore
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
-        toast.success('Análise de paradas copiada!');
-      } catch {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `analise-paradas-${tabKey}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Análise de paradas baixada!');
-      }
+      const result = await copyReport(ref.current, 1526, `analise-paradas-${tabKey}.png`);
+      toast.success(result === 'copied' ? 'Análise de paradas copiada!' : 'Análise de paradas baixada!');
     } catch (e) {
       console.error(e);
       toast.error('Erro ao copiar análise de paradas');
     } finally {
-      el.style.overflow = prev.overflow;
-      el.style.overflowY = prev.overflowY;
-      el.style.maxHeight = prev.maxHeight;
-      el.style.height = prev.height;
       setCopyingTab(null);
     }
   };
@@ -997,7 +948,7 @@ export function TimelineChart({
     onClick: () => void;
     tabKey: string;
   }) => (
-    <Button size="sm" variant="outline" onClick={onClick} className="gap-1">
+    <Button size="sm" variant="outline" onClick={onClick} disabled={copyingTab !== null} className="gap-1">
       <Copy className="w-3.5 h-3.5" />
       {copyingTab === tabKey ? 'Copiando...' : 'Copiar Análise'}
     </Button>
