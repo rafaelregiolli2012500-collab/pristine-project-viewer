@@ -470,7 +470,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="linha-tempo" forceMount className="mt-0 data-[state=inactive]:hidden">
-            <LinhaDoTempo records={records} equipment={equipment} onAddToHistory={addFromTimeline} />
+            <LinhaDoTempo records={records} onAddToHistory={addFromTimeline} />
           </TabsContent>
 
           <TabsContent value="cadastro" className="mt-0 space-y-4">

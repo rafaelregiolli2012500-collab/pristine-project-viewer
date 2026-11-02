@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stopCountsByFront, maintenanceWindows, maintenanceRanking, unionMinutes, allHarvesterWindows, showsAllHarvesters, type AnalysisSegment } from './timelineFrontAnalysis';
+import { stopCountsByFront, maintenanceWindows, maintenanceRanking, unionMinutes, type AnalysisSegment } from './timelineFrontAnalysis';
 
 const H = 3600000, T0 = new Date(2026, 9, 9, 6).getTime();
 const seg = (id: string, equipamento: string, frente: string, categoria: AnalysisSegment['categoria'], category: string, h0: number, h1: number, manutencao = false): AnalysisSegment =>
