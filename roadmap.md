@@ -31,3 +31,5 @@
 
 - [x] Linha do Tempo: base Canavieiros, 4 seletores dinâmicos, visão consolidada de efetividade por frente, Frente dos tratores pelo Grupo Equipamento, gráficos por seletor
 - [x] Acesso administrativo só como ícone discreto no rodapé da aba Config (card do topo removido) — Central abre em nova aba; verificado na prévia.
+
+- [x] Remover o gráfico "todas as colhedoras" da aba Gráfico (Linha do Tempo) — componente, cálculos, testes e regra removidos; cópias completas de relatório preservadas; 51 testes aprovados e prévia conferida.
