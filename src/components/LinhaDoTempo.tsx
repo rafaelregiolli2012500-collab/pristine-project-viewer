@@ -22,11 +22,11 @@ import {
 import { HarvesterIcon, TractorIcon, TruckIcon } from '@/components/coa/MachineIcons';
 
 import * as XLSX from 'xlsx';
-import type { MaintenanceRecord, Equipment } from '@/types/maintenance';
+import type { MaintenanceRecord } from '@/types/maintenance';
 import { buildFrontComparison, shouldSplitStopLines, frontKey } from '@/lib/timelineFrontComparison';
 import { toast } from '@/hooks/use-toast';
-import { stopCountsByFront, maintenanceWindows, maintenanceRanking, unionMinutes, allHarvesterWindows, showsAllHarvesters } from '@/lib/timelineFrontAnalysis';
-import { AllHarvestersChart } from '@/components/timeline/AllHarvestersChart';
+import { stopCountsByFront, maintenanceWindows, maintenanceRanking, unionMinutes } from '@/lib/timelineFrontAnalysis';
+
 import { FrontTimesComparison, ConsolidatedAnalysis, type FrontBreakdown, type BaseTimes } from '@/components/timeline/FrontAnalysisPanels';
 import { TruckLogisticsDashboard } from '@/components/timeline/TruckLogisticsDashboard';
 import { truckNorm, type TruckImport } from '@/lib/truckTimeline';
@@ -471,11 +471,11 @@ type AddToHistoryFn = (
   payload: Omit<MaintenanceRecord, 'id' | 'status' | 'stopReason'>
 ) => { ok: boolean; error?: string; duplicate?: boolean };
 
-export function LinhaDoTempo({ records = [], equipment = [], onAddToHistory }: {
+export function LinhaDoTempo({ records = [], onAddToHistory }: {
   records?: MaintenanceRecord[];
-  equipment?: Equipment[];
   onAddToHistory?: AddToHistoryFn;
 } = {}) {
+
   /** IDs de eventos da Linha do Tempo já enviados ao Histórico. */
   const addedEventIds = useMemo(
     () => new Set(records.map(r => r.sourceEventId).filter((v): v is string => !!v)),
@@ -838,9 +838,6 @@ export function LinhaDoTempo({ records = [], equipment = [], onAddToHistory }: {
       ? { start: dayStart.getTime() + viewStartOff * 3600000, end: dayStart.getTime() + viewEndOff * 3600000 }
       : { start: dayStart.getTime(), end: dayEnd.getTime() };
   }, [dayStart, dayEnd, isHourMode, viewStartOff, viewEndOff]);
-  const allHarvesters = useMemo(() => showsAllHarvesters(filters.categoria)
-    ? allHarvesterWindows(analysisSegs, equipment.filter(e => !filters.frente.length || filters.frente.some(f => frontKey(f) === frontKey(e.frente))), analysisRange.start, analysisRange.end)
-    : [], [analysisSegs, equipment, filters.categoria, filters.frente, analysisRange]);
   const consolidated = useMemo(() => {
     if (comparisonBase !== 'auto') return null;
     const cs = analysisSegs.filter(s => s.categoria !== 'canavieiro');
@@ -1637,7 +1634,6 @@ export function LinhaDoTempo({ records = [], equipment = [], onAddToHistory }: {
           </CardContent></Card>
         ) : (
           <>
-            {showsAllHarvesters(filters.categoria) && <AllHarvestersChart fronts={allHarvesters} start={analysisRange.start} end={analysisRange.end} />}
             <section className="border-b border-border pb-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>

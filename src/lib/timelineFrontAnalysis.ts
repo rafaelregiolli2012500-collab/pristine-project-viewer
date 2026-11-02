@@ -18,59 +18,6 @@ export interface AnalysisSegment {
   manutencao: boolean;   // parada classificada como manutenção pela regra existente
 }
 
-export const showsAllHarvesters = (selector: string) => selector === 'colhedora';
-
-/** Confirmed simultaneous production, using the entire registered fleet, never gaps. */
-export function allHarvesterWindows(
-  segs: AnalysisSegment[],
-  inventory: Array<{ frota: string; frente?: string; equipmentType: string }>,
-  rangeStart: number, rangeEnd: number,
-) {
-  const fleetKey = (v: string) => /^\d+$/.test(v.trim()) ? String(Number(v)) : v.trim();
-  const fleets = new Map<string, Set<string>>();
-  for (const e of inventory) {
-    if (e.equipmentType !== 'colhedora' || !e.frota.trim() || !e.frente) continue;
-    const front = frontKey(e.frente);
-    const set = fleets.get(front) ?? new Set<string>();
-    set.add(fleetKey(e.frota)); fleets.set(front, set);
-  }
-  const byFront = new Map<string, AnalysisSegment[]>();
-  for (const s of segs) {
-    const front = frontKey(s.frente);
-    if (s.categoria !== 'colhedora' || !fleets.get(front)?.has(fleetKey(s.equipamento))) continue;
-    const items = byFront.get(front) ?? [];
-    items.push(s); byFront.set(front, items);
-  }
-  return [...fleets.entries()].sort(([a], [b]) => sortFronts(a, b)).map(([frente, fleet]) => {
-    const events = new Map<number, Array<{ frota: string; production: boolean; delta: number }>>();
-    for (const s of byFront.get(frente) ?? []) {
-      const a = Math.max(rangeStart, s.clipStart.getTime()), b = Math.min(rangeEnd, s.clipEnd.getTime());
-      if (!(b > a)) continue;
-      for (const [time, delta] of [[a, 1], [b, -1]]) {
-        const entries = events.get(time) ?? [];
-        entries.push({ frota: fleetKey(s.equipamento), production: s.category === 'producao', delta });
-        events.set(time, entries);
-      }
-    }
-    const active = new Map<string, { production: number; other: number }>();
-    const points = [...events.keys()].sort((a, b) => a - b);
-    const windows: Array<{ start: number; end: number; durMin: number }> = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const start = points[i], end = points[i + 1];
-      for (const e of events.get(start) ?? []) {
-        const state = active.get(e.frota) ?? { production: 0, other: 0 };
-        if (e.production) state.production += e.delta; else state.other += e.delta;
-        active.set(e.frota, state);
-      }
-      if (![...fleet].every(f => { const s = active.get(f); return s && s.production > 0 && s.other === 0; })) continue;
-      const last = windows[windows.length - 1];
-      if (last?.end === start) { last.end = end; last.durMin = (end - last.start) / 60000; }
-      else windows.push({ start, end, durMin: (end - start) / 60000 });
-    }
-    return { frente, equipamentos: fleet.size, windows, totalMin: windows.reduce((sum, w) => sum + w.durMin, 0) };
-  });
-}
-
 /** Id único da ocorrência: recortes do mesmo evento compartilham este id. */
 export const eventId = (s: { id: string }) => s.id.split('@')[0];
 
