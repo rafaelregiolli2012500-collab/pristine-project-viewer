@@ -33,3 +33,4 @@
 - [x] Acesso administrativo só como ícone discreto no rodapé da aba Config (card do topo removido) — Central abre em nova aba; verificado na prévia.
 
 - [x] Remover o gráfico "todas as colhedoras" da aba Gráfico (Linha do Tempo) — componente, cálculos, testes e regra removidos; cópias completas de relatório preservadas; 51 testes aprovados e prévia conferida.
+- [x] Menu lateral: ícone de escadinha do "Dashboard Frentes" trocado por barras + engrenagem em âmbar (FleetDashboardIcon), com brilho do tema; demais ícones intactos; prévia conferida.
