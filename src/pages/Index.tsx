@@ -25,12 +25,12 @@ import { TrajetosView } from '@/components/TrajetosView';
 import { LinhaDoTempo } from '@/components/LinhaDoTempo';
 import { BaseTerceirosView } from '@/components/BaseTerceirosView';
 import { useBaseTerceirosStore } from '@/hooks/useBaseTerceirosStore';
-import { History, BarChart3, Camera, Wrench, LayoutDashboard, Factory, Route, ClipboardList, Settings2, Activity, PowerOff, Lock, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { History, BarChart3, Camera, Wrench, Factory, Route, ClipboardList, Settings2, Activity, PowerOff, Lock, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { MoagemModule } from '@/components/MoagemModule';
 import { useSystemTime } from '@/hooks/useSystemTime';
 import { CoaHeader } from '@/components/coa/CoaHeader';
 import { KpiCard } from '@/components/coa/KpiCard';
-import { HarvesterIcon, TractorIcon, TruckIcon } from '@/components/coa/MachineIcons';
+import { HarvesterIcon, TractorIcon, TruckIcon, FleetDashboardIcon } from '@/components/coa/MachineIcons';
 import coaHero from '@/assets/coa-hero.jpg';
 import { setInstallationName } from '@/lib/access/local';
 import { getActiveUnit } from '@/lib/units';
@@ -39,7 +39,7 @@ const GREEN = '#22C55E';
 const BLUE = '#3B82F6';
 const AMBER = '#F59E0B';
 
-const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: React.ComponentType<{ className?: string }> }[] }[] = [
+const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: React.ComponentType<{ className?: string }>; iconColor?: string }[] }[] = [
   {
     title: 'Operações',
     items: [
@@ -50,7 +50,7 @@ const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: 
   {
     title: 'Dashboard',
     items: [
-      { value: 'dashboard', label: 'Dashboard Frentes', icon: LayoutDashboard },
+      { value: 'dashboard', label: 'Dashboard Frentes', icon: FleetDashboardIcon, iconColor: AMBER },
       { value: 'dash-caminhoes', label: 'Dash Caminhões', icon: TruckIcon },
       { value: 'moagem', label: 'Moagem', icon: Factory },
     ],
@@ -302,7 +302,14 @@ const Index = () => {
                       title={item.label}
                       className={`coa-nav-item w-auto justify-start! lg:w-full ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
                     >
-                      <item.icon className="size-[18px] shrink-0" />
+                      <item.icon
+                        className="size-[18px] shrink-0"
+                        style={
+                          item.iconColor
+                            ? { color: item.iconColor, filter: `drop-shadow(0 0 6px ${item.iconColor}66)` }
+                            : undefined
+                        }
+                      />
                       <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
                     </TabsTrigger>
                   ))}
