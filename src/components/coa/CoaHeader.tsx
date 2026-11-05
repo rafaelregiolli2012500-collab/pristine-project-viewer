@@ -3,9 +3,9 @@
  * Autor e criador: Rafael Regiolli de Souza
  */
 import { useEffect, useState } from 'react';
-import { PowerOff, AlertTriangle } from 'lucide-react';
 import monitLogo from '@/assets/monit-logo.png';
 import { WindowControls } from '@/components/coa/WindowControls';
+import { FleetDashboardIcon } from '@/components/coa/MachineIcons';
 import { useUnit } from '@/hooks/useUnit';
 
 function turnoOf(d: Date) {
@@ -98,7 +98,7 @@ export function CoaHeader({ paradas, baseTerceiros }: Props) {
           style={{ ['-webkit-app-region' as any]: 'no-drag' }}
         >
           <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-1.5">
-            <AlertTriangle className="size-3.5 shrink-0 text-destructive" />
+            <FleetDashboardIcon className="coa-pill-icon-danger size-4 shrink-0 text-destructive" strokeWidth={2.4} />
             <span className="font-mono text-xs font-bold tabular-nums text-destructive">{paradas}</span>
             <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-destructive/80 md:inline">paradas</span>
           </div>
@@ -107,7 +107,7 @@ export function CoaHeader({ paradas, baseTerceiros }: Props) {
             className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-1.5"
             title="Equipamentos indisponíveis na Base ou em Terceiros"
           >
-            <PowerOff className="size-3.5 shrink-0 text-warning" />
+            <FleetDashboardIcon className="coa-pill-icon-warn size-4 shrink-0 text-warning" strokeWidth={2.4} />
             <span className="font-mono text-xs font-bold tabular-nums text-warning">{baseTerceiros}</span>
             <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-warning/80 md:inline">base/terceiros</span>
           </div>

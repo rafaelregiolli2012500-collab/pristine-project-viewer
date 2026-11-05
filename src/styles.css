@@ -282,14 +282,9 @@
   &[data-state="active"] svg { color: hsl(var(--primary)); }
 }
 
-/* ===== Ícone de dashboard: barras + engrenagem em âmbar, tom do tema ===== */
-.coa-nav-item .coa-icon-amber {
-  color: hsl(var(--warning));
-  filter: drop-shadow(0 0 6px hsl(var(--warning) / 0.45));
-}
-.coa-nav-item[data-state="active"] .coa-icon-amber {
-  color: hsl(var(--warning));
-}
+/* ===== Ícones das pílulas flutuantes do cabeçalho: barras + engrenagem com brilho do tema ===== */
+.coa-pill-icon-danger { filter: drop-shadow(0 0 5px hsl(var(--destructive) / 0.5)); }
+.coa-pill-icon-warn { filter: drop-shadow(0 0 5px hsl(var(--warning) / 0.5)); }
 
 @utility coa-group-label {
   padding: 0 0.9rem;
