@@ -33,5 +33,3 @@
 - [x] Acesso administrativo só como ícone discreto no rodapé da aba Config (card do topo removido) — Central abre em nova aba; verificado na prévia.
 
 - [x] Remover o gráfico "todas as colhedoras" da aba Gráfico (Linha do Tempo) — componente, cálculos, testes e regra removidos; cópias completas de relatório preservadas; 51 testes aprovados e prévia conferida.
-- [x] Menu lateral: volta ao ícone original de escadinha (LayoutDashboard) no "Dashboard Frentes" — a troca anterior foi desfeita a pedido do usuário.
-- [x] Pílulas flutuantes do cabeçalho (PARADAS / BASE/TERCEIROS): ícone de barras + engrenagem (FleetDashboardIcon) no lugar dos antigos, cada um na cor da sua pílula (vermelho / âmbar) com brilho do tema; 16px e traço 2.4 para legibilidade; 51 testes aprovados e prévia conferida.
