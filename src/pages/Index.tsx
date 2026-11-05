@@ -39,7 +39,7 @@ const GREEN = '#22C55E';
 const BLUE = '#3B82F6';
 const AMBER = '#F59E0B';
 
-const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: React.ComponentType<{ className?: string }>; iconColor?: string }[] }[] = [
+const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: React.ComponentType<{ className?: string }>; iconClass?: string }[] }[] = [
   {
     title: 'Operações',
     items: [
@@ -50,7 +50,7 @@ const NAV_GROUPS: { title: string; items: { value: string; label: string; icon: 
   {
     title: 'Dashboard',
     items: [
-      { value: 'dashboard', label: 'Dashboard Frentes', icon: FleetDashboardIcon, iconColor: AMBER },
+      { value: 'dashboard', label: 'Dashboard Frentes', icon: FleetDashboardIcon, iconClass: 'coa-icon-amber' },
       { value: 'dash-caminhoes', label: 'Dash Caminhões', icon: TruckIcon },
       { value: 'moagem', label: 'Moagem', icon: Factory },
     ],
@@ -302,14 +302,7 @@ const Index = () => {
                       title={item.label}
                       className={`coa-nav-item w-auto justify-start! lg:w-full ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
                     >
-                      <item.icon
-                        className="size-[18px] shrink-0"
-                        style={
-                          item.iconColor
-                            ? { color: item.iconColor, filter: `drop-shadow(0 0 6px ${item.iconColor}66)` }
-                            : undefined
-                        }
-                      />
+                      <item.icon className={`size-[18px] shrink-0 ${item.iconClass ?? ''}`} />
                       <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
                     </TabsTrigger>
                   ))}
