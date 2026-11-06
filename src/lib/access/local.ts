@@ -64,7 +64,9 @@ export function getInstallationId(): string {
       desktopId = official;
       return official;
     }
-    throw new Error('Installation ID da máquina indisponível');
+    /* Falha fechada: sem ID oficial não há consulta nem cofre válido,
+       e nunca se gera um ID paralelo no perfil. */
+    return '';
   }
   if (existing) return existing;
   const gerado =
