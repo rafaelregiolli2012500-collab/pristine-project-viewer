@@ -16,3 +16,4 @@
 - Truck telemetry uses the existing canavieiros raw base and one worker parser/shared observation-pair helper in truckTimeline; why: point telemetry needs gap-aware intervals and original counts that aggregated front segments cannot recover, while other equipment pipelines remain unchanged.
 - Integral backups use native storage operations retained by the unit scope and an explicit all-units marker; why: export, restore, validation and rollback must preserve unit prefixes while legacy backups remain scoped.
 - Report image copying uses the browser-only reportCapture helper to capture an isolated full-width clone; why: viewport size and surrounding controls must not crop or pollute the report.
+- Installation ID is resolved only by the Electron main process (electron/identity.cjs) from a shared machine-wide file in ProgramData, migrating the legacy profile ID via a sync preload IPC; why: one computer must be one installation at the Central for every Windows user.
