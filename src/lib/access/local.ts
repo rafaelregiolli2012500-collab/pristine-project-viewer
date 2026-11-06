@@ -44,9 +44,30 @@ function store(): Storage | null {
 /* Identificação da instalação                                         */
 /* ------------------------------------------------------------------ */
 
+let desktopId: string | null = null;
+
+type DesktopIdentity = { resolveInstallationId?: (legacy: string | null) => string | null };
+
 export function getInstallationId(): string {
   const s = store();
   const existing = s?.getItem(KEY_INSTALLATION);
+  /* Desktop: o Electron é a autoridade (ID único por máquina em ProgramData).
+     O ID antigo do perfil só é enviado para migração e nunca é apagado. */
+  const bridge =
+    typeof window !== 'undefined'
+      ? (window as unknown as { monitCampo?: DesktopIdentity }).monitCampo
+      : undefined;
+  if (bridge?.resolveInstallationId) {
+    if (desktopId) return desktopId;
+    const official = bridge.resolveInstallationId(existing ?? null);
+    if (typeof official === 'string' && official) {
+      desktopId = official;
+      return official;
+    }
+    /* Falha fechada: sem ID oficial não há consulta nem cofre válido,
+       e nunca se gera um ID paralelo no perfil. */
+    return '';
+  }
   if (existing) return existing;
   const gerado =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto

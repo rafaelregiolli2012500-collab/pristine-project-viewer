@@ -5,6 +5,7 @@
 const { app, BrowserWindow, shell, protocol, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { resolveInstallationId } = require('./identity.cjs');
 
 app.setName('MONIT.CAMPO');
 if (process.platform === 'win32') app.setAppUserModelId('com.monit.campo');
@@ -214,11 +215,22 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.on('admin:open', () => openAdminWindow());
 
     /**
-     * IDENTIDADE DA INSTALAÇÃO
-     * O Installation ID é único e vive exclusivamente em
-     * src/lib/access/local.ts (UUID persistente no armazenamento local).
-     * O processo principal NÃO gera nem guarda identificador paralelo.
+     * IDENTIDADE DA INSTALAÇÃO — o processo principal é a autoridade.
+     * ID único por máquina em C:\ProgramData\MONIT.CAMPO\installation-id,
+     * igual para todos os usuários do Windows (ver electron/identity.cjs).
+     * O renderer envia apenas o ID antigo do perfil para migração.
      */
+    let officialId = null;
+    ipcMain.on('identity:resolve', (event, legacyId) => {
+      try {
+        if (!officialId) officialId = resolveInstallationId({ legacyId }).id;
+        else resolveInstallationId({ legacyId }); // registra conflito, se houver
+        event.returnValue = officialId;
+      } catch (err) {
+        console.error('[identity]', err);
+        event.returnValue = null;
+      }
+    });
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

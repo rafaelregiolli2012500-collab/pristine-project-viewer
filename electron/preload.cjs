@@ -20,4 +20,7 @@ contextBridge.exposeInMainWorld('monitCampo', {
   },
   /** Abre a janela administrativa do Painel Central (online). */
   openAdminPanel: () => ipcRenderer.send('admin:open'),
+  /** Installation ID oficial da máquina (compartilhado entre usuários do Windows). */
+  resolveInstallationId: (legacyId) =>
+    ipcRenderer.sendSync('identity:resolve', typeof legacyId === 'string' ? legacyId : null),
 });
