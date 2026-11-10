@@ -22,18 +22,21 @@ principal e o preload — nunca o código do frontend.
 npm install
 npm run dev            # desenvolvimento web (TanStack Start)
 npm run build          # build web
-npm run icons          # gera build/icon.ico + build/icon.png a partir de public/icon.png
-npm run electron:build # compila o frontend para dist-electron/
+npm run icons          # gera installer/icon.ico + installer/icon.png a partir de public/icon.png
+npm run build:electron # compila o frontend para dist-electron/
 npm run electron       # compila e abre o app desktop
-npm run dist           # instalador NSIS + portátil (Windows)
-npm run build:exe      # idêntico ao dist
+npm run dist           # limpa, compila e gera instalador NSIS + portátil (Windows x64)
+npm run dist:setup     # só o instalador
+npm run dist:portable  # só a versão portátil
 ```
 
 `npm run dist` produz em `release/`:
 
 - `MONIT.CAMPO-Setup.exe` — instalador NSIS (pasta escolhível, atalhos, desinstalador)
-- `MONIT.CAMPO.exe` — versão portátil
+- `MONIT.CAMPO-Portatil.exe` — versão portátil
 - `win-unpacked/MONIT.CAMPO.exe` — executável descompactado
+
+> Os recursos do instalador (`installer.nsh`, ícones) ficam em `installer/` — não em `build/`.
 
 > O passo final de gravação do ícone no `.exe` exige Windows (ou Wine). Rode `npm run dist`
 > em uma máquina Windows 10/11 para obter o instalador completo.

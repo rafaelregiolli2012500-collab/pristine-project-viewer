@@ -15,9 +15,12 @@
     "icons": "node scripts/make-icons.mjs",
     "build:electron": "npm run icons && vite build --config vite.electron.config.ts",
     "electron": "npm run build:electron && electron .",
-    "dist": "npm run build:electron && electron-builder --win nsis",
+    "dist": "npm run clean && npm run build:electron && electron-builder --win --x64",
     "test": "vitest run",
-    "test:access": "vitest run src/lib/access"
+    "test:access": "vitest run src/lib/access",
+    "clean": "node -e \"for (const d of ['dist-electron','release']) require('fs').rmSync(d,{recursive:true,force:true})\"",
+    "dist:setup": "npm run clean && npm run build:electron && electron-builder --win nsis --x64",
+    "dist:portable": "npm run clean && npm run build:electron && electron-builder --win portable --x64"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -110,27 +113,43 @@
     "asar": true,
     "directories": {
       "output": "release",
-      "buildResources": "build"
+      "buildResources": "installer"
     },
     "files": [
       "electron/**",
       "dist-electron/**",
-      "build/icon.*",
+      "installer/icon.*",
       "package.json"
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "icon": "build/icon.ico"
+      "icon": "installer/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": true,
-      "include": "build/installer.nsh",
+      "include": "installer/installer.nsh",
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "MONIT.CAMPO-Setup-${version}.${ext}",
-      "shortcutName": "MONIT.CAMPO"
+      "artifactName": "MONIT.CAMPO-Setup.${ext}",
+      "shortcutName": "MONIT.CAMPO",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "MONIT.CAMPO-Portatil.${ext}"
     }
   }
 }
