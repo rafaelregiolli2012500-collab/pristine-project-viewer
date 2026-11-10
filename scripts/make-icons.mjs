@@ -1,5 +1,5 @@
 /**
- * Gera build/icon.ico e build/icon.png a partir de public/icon.png.
+ * Gera installer/icon.ico e installer/icon.png a partir de public/icon.png.
  * Puro Node (zlib) — sem dependências nativas, funciona em Windows/Linux/macOS.
  */
 import fs from 'node:fs';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = path.join(root, 'public', 'icon.png');
-const OUT_DIR = path.join(root, 'build');
+const OUT_DIR = path.join(root, 'installer');
 const SIZES = [256, 128, 64, 48, 32, 16];
 
 function decodePng(buffer) {
@@ -165,4 +165,4 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const entries = SIZES.map((size) => ({ size, data: encodePng(size === src.width ? src : resize(src, size)) }));
 fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), buildIco(entries));
 fs.writeFileSync(path.join(OUT_DIR, 'icon.png'), encodePng(src.width === 256 ? src : resize(src, 256)));
-console.log(`build/icon.ico gerado (${SIZES.join(', ')} px) e build/icon.png (256px).`);
+console.log(`installer/icon.ico gerado (${SIZES.join(', ')} px) e installer/icon.png (256px).`);

@@ -13,7 +13,7 @@ if (process.platform === 'win32') app.setAppUserModelId('com.monit.campo');
 const ICON_PATH = path.join(
   __dirname,
   '..',
-  'build',
+  'installer',
   process.platform === 'win32' ? 'icon.ico' : 'icon.png',
 );
 
