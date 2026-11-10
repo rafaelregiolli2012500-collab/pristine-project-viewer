@@ -35,3 +35,4 @@
 - [x] Remover o gráfico "todas as colhedoras" da aba Gráfico (Linha do Tempo) — componente, cálculos, testes e regra removidos; cópias completas de relatório preservadas; 51 testes aprovados e prévia conferida.
 - [x] Installation ID único por máquina (ProgramData, migração do ID antigo, instalador perMachine); validação em Windows real pendente com a TI.
 - [x] Instalador Windows: causa real encontrada ($COMMONAPPDATA inexistente no NSIS + avisos tratados como erro) e corrigida em build/installer.nsh; SETUP.exe gerado de ponta a ponta aqui; instalação em Windows real pendente.
+- [x] Estrutura do instalador: recursos movidos para installer/, scripts clean/dist/dist:setup/dist:portable, alvo portátil; NSIS e portátil verificados aqui (etapas que exigem Windows puladas só na verificação).

@@ -17,3 +17,4 @@
 - Integral backups use native storage operations retained by the unit scope and an explicit all-units marker; why: export, restore, validation and rollback must preserve unit prefixes while legacy backups remain scoped.
 - Report image copying uses the browser-only reportCapture helper to capture an isolated full-width clone; why: viewport size and surrounding controls must not crop or pollute the report.
 - Installation ID is resolved only by the Electron main process (electron/identity.cjs) from a shared machine-wide file in ProgramData, migrating the legacy profile ID via a sync preload IPC; why: one computer must be one installation at the Central for every Windows user.
+- electron-builder resources (installer.nsh, generated icons) live in installer/, never build/; why: a build/ folder was repeatedly lost from the synced project, breaking npm run dist.
